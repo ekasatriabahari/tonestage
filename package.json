@@ -9,6 +9,14 @@
     "start": "react-native start",
     "test": "jest"
   },
+  "codegenConfig": {
+    "name": "NativeYiControlSpec",
+    "type": "all",
+    "jsSrcsDir": "specs",
+    "android": {
+      "javaPackageName": "com.tonestage.app.yi"
+    }
+  },
   "dependencies": {
     "react": "19.3.0",
     "react-native": "0.88.0",

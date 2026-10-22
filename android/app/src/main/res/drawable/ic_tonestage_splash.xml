@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ToneStage splash logo: guitar pick + waveform + record dot.
+  288dp canvas as used for the Android 12+ splash icon. Android masks it to a
+  192dp circle, so all artwork stays within a radius of about 76 from the center (144,144).
+  Colors come from values/tonestage_colors.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+
+    <group
+        android:pivotX="144"
+        android:pivotY="144"
+        android:scaleX="1.1"
+        android:scaleY="1.1">
+
+        <!-- Guitar pick -->
+        <path
+            android:fillColor="@color/tonestage_surface"
+            android:strokeColor="@color/tonestage_accent"
+            android:strokeWidth="5"
+            android:strokeLineJoin="round"
+            android:pathData="M108,88 L180,88 C196,88 204,102 198,116 L156,196 C150,208 138,208 132,196 L90,116 C84,102 92,88 108,88 Z" />
+
+        <!-- Recording dot -->
+        <path
+            android:fillColor="@color/tonestage_record"
+            android:pathData="M138,98 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z" />
+
+        <!-- Waveform bars -->
+        <path
+            android:strokeColor="@color/tonestage_ink"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M120,137 L120,155" />
+        <path
+            android:strokeColor="@color/tonestage_ink"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M132,129 L132,163" />
+        <path
+            android:strokeColor="@color/tonestage_accent"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M144,120 L144,172" />
+        <path
+            android:strokeColor="@color/tonestage_ink"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M156,131 L156,161" />
+        <path
+            android:strokeColor="@color/tonestage_ink"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M168,139 L168,153" />
+    </group>
+</vector>

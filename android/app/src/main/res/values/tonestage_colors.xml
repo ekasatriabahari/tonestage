@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ToneStage brand colors. Change these to rebrand the splash screen and logo. -->
+<resources>
+    <color name="tonestage_background">#0B0C0F</color>
+    <color name="tonestage_surface">#1A1D24</color>
+    <color name="tonestage_accent">#FFA62B</color>
+    <color name="tonestage_ink">#F4F1EA</color>
+    <color name="tonestage_record">#FF3B30</color>
+</resources>
