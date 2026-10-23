@@ -31,6 +31,24 @@ export interface Spec extends TurboModule {
     seconds: number,
   ): Promise<string>;
 
+  /**
+   * Starts a live level meter on the device (nothing is recorded to a file). Resolves with a JSON
+   * string {ok, error, source, sampleRate, channels}. Needs the microphone permission.
+   */
+  startMeter(
+    deviceId: number,
+    sampleRate: number,
+    channelCount: number,
+  ): Promise<string>;
+
+  /**
+   * Levels since the previous call, as JSON {running, error, routedToSelected, frames, peaks, rms,
+   * clippedTotal}. Peaks and RMS are 0.0 to 1.0 of full scale.
+   */
+  getMeterLevels(): Promise<string>;
+
+  stopMeter(): Promise<void>;
+
   /** Plays a WAV file (for listening to a test recording). */
   playTest(path: string): Promise<void>;
 

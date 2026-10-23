@@ -29,6 +29,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
 
   private val executor: ExecutorService = Executors.newSingleThreadExecutor()
   private var player: MediaPlayer? = null
+  private val meter = AudioMeter()
 
   override fun getName() = NAME
 
@@ -61,6 +62,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
   override fun probeInput(deviceId: Double, promise: Promise) {
     executor.execute {
       try {
+        meter.stop()
         if (!hasMicPermission()) {
           promise.reject("NO_PERMISSION", "RECORD_AUDIO is not granted")
           return@execute
@@ -108,6 +110,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
       var writer: WavWriter? = null
       var file: File? = null
       try {
+        meter.stop()
         if (!hasMicPermission()) {
           promise.reject("NO_PERMISSION", "RECORD_AUDIO is not granted")
           return@execute
@@ -149,6 +152,43 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
         file?.delete()
         promise.reject("AUDIO_ERROR", e.message ?: "Recording failed")
       }
+    }
+  }
+
+  // ---- live level meter ----------------------------------------------------------------------
+
+  override fun startMeter(
+      deviceId: Double,
+      sampleRate: Double,
+      channelCount: Double,
+      promise: Promise,
+  ) {
+    executor.execute {
+      try {
+        if (!hasMicPermission()) {
+          promise.reject("NO_PERMISSION", "RECORD_AUDIO is not granted")
+          return@execute
+        }
+        val device = findInput(deviceId.toInt())
+        if (device == null) {
+          promise.reject("DEVICE_NOT_FOUND", "Input device ${deviceId.toInt()} is not connected")
+          return@execute
+        }
+        promise.resolve(meter.start(device, sampleRate.toInt(), channelCount.toInt()).toString())
+      } catch (e: Exception) {
+        promise.reject("AUDIO_ERROR", e.message ?: "Could not start the meter")
+      }
+    }
+  }
+
+  override fun getMeterLevels(promise: Promise) {
+    promise.resolve(meter.snapshot().toString())
+  }
+
+  override fun stopMeter(promise: Promise) {
+    executor.execute {
+      meter.stop()
+      promise.resolve(null)
     }
   }
 
@@ -225,6 +265,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
   }
 
   override fun invalidate() {
+    meter.stop()
     stopPlayerLocked()
     executor.shutdownNow()
     super.invalidate()

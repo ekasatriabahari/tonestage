@@ -7,6 +7,7 @@ import {
   type ProbeEntry,
   type RecordResult,
 } from './audioProbe';
+import { type MeterSnapshot, parseMeterSnapshot, parseMeterStart } from './audioMeter';
 
 type Failure = { ok: false; message: string };
 
@@ -111,5 +112,63 @@ export async function exportAudioTest(
     return { ok: true, location };
   } catch (error) {
     return { ok: false, message: describeAudioTestError(errorCode(error)) };
+  }
+}
+
+export type MeterStartResult =
+  | { ok: true; sampleRate: number; channels: number; source: string }
+  | Failure;
+
+/**
+ * Starts the live meter. 44100 Hz stereo is tried first (the rate the Pocket Master is reported to
+ * use), then 48000 Hz stereo. The values Android really uses are returned.
+ */
+export async function startAudioMeter(deviceId: number): Promise<MeterStartResult> {
+  if (NativeAudioInput == null) {
+    return { ok: false, message: describeAudioTestError('MODULE_UNAVAILABLE') };
+  }
+  if (!(await ensureMicPermission())) {
+    return { ok: false, message: describeAudioTestError('NO_PERMISSION') };
+  }
+  let lastError = 'INIT_FAILED';
+  for (const rate of [44100, 48000]) {
+    try {
+      const start = parseMeterStart(await NativeAudioInput.startMeter(deviceId, rate, 2));
+      if (start.ok) {
+        return {
+          ok: true,
+          sampleRate: start.sampleRate,
+          channels: start.channels,
+          source: start.source,
+        };
+      }
+      lastError = start.error;
+    } catch (error) {
+      return { ok: false, message: describeAudioTestError(errorCode(error)) };
+    }
+  }
+  return { ok: false, message: describeAudioTestError(lastError) };
+}
+
+/** Null when the snapshot cannot be read. */
+export async function readAudioMeter(): Promise<MeterSnapshot | null> {
+  if (NativeAudioInput == null) {
+    return null;
+  }
+  try {
+    return parseMeterSnapshot(await NativeAudioInput.getMeterLevels());
+  } catch {
+    return null;
+  }
+}
+
+export async function stopAudioMeter(): Promise<void> {
+  if (NativeAudioInput == null) {
+    return;
+  }
+  try {
+    await NativeAudioInput.stopMeter();
+  } catch {
+    // Nothing useful to do.
   }
 }
