@@ -238,7 +238,8 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
         val resolver = getReactApplicationContext().contentResolver
         val values = ContentValues()
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
-        values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/wav")
+        val mime = if (source.name.endsWith(".mp4")) "video/mp4" else "audio/wav"
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mime)
         values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/ToneStage")
         val uri =
             resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)

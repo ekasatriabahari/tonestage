@@ -172,3 +172,6 @@ export async function stopAudioMeter(): Promise<void> {
     // Nothing useful to do.
   }
 }
+
+/** Same export action, used for video test recordings too (the native side picks the file type). */
+export const exportRecordedFile = exportAudioTest;

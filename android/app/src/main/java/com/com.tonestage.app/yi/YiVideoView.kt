@@ -16,6 +16,7 @@ import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.events.Event
+import java.io.File
 
 /**
  * Plays the camera's RTSP stream with Media3. Reports only what the player really knows:
@@ -30,6 +31,7 @@ import com.facebook.react.uimanager.events.Event
 class YiVideoView(context: Context) : PlayerView(context) {
 
   private var player: ExoPlayer? = null
+  private val recorder = StreamRecorder()
   private var currentSource: String? = null
 
   init {
@@ -60,6 +62,7 @@ class YiVideoView(context: Context) : PlayerView(context) {
           // reason (shortened) to make failures diagnosable from the screen.
           val detail = (error.cause?.message ?: error.message).orEmpty().take(160)
           val text = if (detail.isEmpty()) error.errorCodeName else "${error.errorCodeName}: $detail"
+          finishRecording()
           emit("error", 0, 0, text)
         }
       }
@@ -93,7 +96,10 @@ class YiVideoView(context: Context) : PlayerView(context) {
             .createMediaSource(MediaItem.fromUri(source))
     // Small buffers: this is a live preview, not a download.
     val loadControl = DefaultLoadControl.Builder().setBufferDurationsMs(500, 1500, 250, 500).build()
-    val newPlayer = ExoPlayer.Builder(context).setLoadControl(loadControl).build()
+    val newPlayer =
+        ExoPlayer.Builder(context, RecordingRenderersFactory(context, recorder))
+            .setLoadControl(loadControl)
+            .build()
     newPlayer.addListener(listener)
     newPlayer.setMediaSource(mediaSource)
     newPlayer.playWhenReady = true
@@ -104,6 +110,7 @@ class YiVideoView(context: Context) : PlayerView(context) {
   }
 
   fun release() {
+    recorder.stop()
     setPlayer(null)
     player?.let {
       it.removeListener(listener)
@@ -111,6 +118,28 @@ class YiVideoView(context: Context) : PlayerView(context) {
     }
     player = null
     renderedFirstFrame = false
+  }
+
+  /**
+   * Starts or stops writing the incoming H.264 stream to an MP4 in the app cache folder. Stopping
+   * reports the measured result with a "recorded" event.
+   */
+  fun setRecording(on: Boolean) {
+    if (on) {
+      if (player == null) {
+        return
+      }
+      recorder.onStarted = { post { emit("recording", 0, 0, "") } }
+      recorder.start(File(context.cacheDir, "video_${System.currentTimeMillis()}.mp4"))
+    } else {
+      finishRecording()
+    }
+  }
+
+  private fun finishRecording() {
+    val result = recorder.stop() ?: return
+    recorder.onStarted = null
+    emit("recorded", 0, 0, result.toString())
   }
 
   private fun emitPlaying() {
