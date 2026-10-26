@@ -49,6 +49,36 @@ export interface Spec extends TurboModule {
 
   stopMeter(): Promise<void>;
 
+  /**
+   * Starts recording the device to a WAV file in the app cache folder. Resolves with JSON
+   * {ok, error, source, sampleRate, channels}.
+   */
+  startAudioCapture(
+    deviceId: number,
+    sampleRate: number,
+    channelCount: number,
+  ): Promise<string>;
+
+  /**
+   * Stops the recording started by startAudioCapture. Resolves with JSON {ok, error, path,
+   * sampleRate, channels, frames, peaks, rms, clippedTotal, timing, startUs, ...}. startUs is the
+   * capture time of the first frame on the System.nanoTime() clock, in microseconds.
+   */
+  stopAudioCapture(): Promise<string>;
+
+  /**
+   * Combines a recorded video MP4 and WAV into one MP4 (video copied, audio encoded to AAC).
+   * Both start times are on the System.nanoTime() clock in microseconds. videoLatencyMs moves the
+   * video earlier by that much. Resolves with JSON {ok, error, path, durationMs, ...}.
+   */
+  mergeRecording(
+    videoPath: string,
+    audioPath: string,
+    videoStartUs: number,
+    audioStartUs: number,
+    videoLatencyMs: number,
+  ): Promise<string>;
+
   /** Plays a WAV file (for listening to a test recording). */
   playTest(path: string): Promise<void>;
 

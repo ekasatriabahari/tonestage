@@ -64,7 +64,15 @@ export type RecordingStats = {
   skippedBeforeStart: number;
   nonMonotonic: number;
   csdFromFormat: boolean;
+  /** Time of the first video sample on the System.nanoTime() clock (microseconds). */
+  firstSampleUs: number;
 };
+
+/** What the preview reports about a video recording. */
+export type RecordingEvent =
+  | { kind: 'started' }
+  | { kind: 'finished'; stats: RecordingStats }
+  | { kind: 'failed'; message: string };
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
 
@@ -87,6 +95,7 @@ export function parseRecordingStats(json: string): RecordingStats {
     skippedBeforeStart: num(e.skippedBeforeStart),
     nonMonotonic: num(e.nonMonotonic),
     csdFromFormat: e.csdFromFormat === true,
+    firstSampleUs: num(e.firstSampleUs),
   };
 }
 

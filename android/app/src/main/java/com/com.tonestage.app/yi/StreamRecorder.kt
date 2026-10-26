@@ -44,6 +44,7 @@ internal class StreamRecorder {
   private var error = ""
   private var startedWallMs = 0L
   private var firstSampleWallMs = 0L
+  private var firstSampleNs = 0L // System.nanoTime() when the first video sample was written
   private var firstTimeUs = 0L
   private var lastPtsUs = 0L
   private var frames = 0
@@ -82,6 +83,7 @@ internal class StreamRecorder {
     error = ""
     startedWallMs = System.currentTimeMillis()
     firstSampleWallMs = 0L
+    firstSampleNs = 0L
     lastPtsUs = 0L
     frames = 0
     keyFrames = 0
@@ -164,6 +166,7 @@ internal class StreamRecorder {
       csdFromFormat = streamSps == null || streamPps == null
       firstTimeUs = timeUs
       firstSampleWallMs = System.currentTimeMillis()
+      firstSampleNs = System.nanoTime()
       state = State.RUNNING
       onStarted?.invoke()
     }
@@ -234,6 +237,8 @@ internal class StreamRecorder {
     json.put("skippedBeforeStart", droppedBeforeStart)
     json.put("nonMonotonic", nonMonotonic)
     json.put("csdFromFormat", csdFromFormat)
+    // On the same clock as the audio recorder (System.nanoTime), so the two can be aligned.
+    json.put("firstSampleUs", firstSampleNs / 1000)
     state = State.IDLE
     file = null
     return json

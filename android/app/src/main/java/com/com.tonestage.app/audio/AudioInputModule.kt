@@ -30,6 +30,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
   private val executor: ExecutorService = Executors.newSingleThreadExecutor()
   private var player: MediaPlayer? = null
   private val meter = AudioMeter()
+  private val fileRecorder = AudioFileRecorder()
 
   override fun getName() = NAME
 
@@ -192,6 +193,83 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
     }
   }
 
+  // ---- recording to a file together with the video ------------------------------------------------
+
+  override fun startAudioCapture(
+      deviceId: Double,
+      sampleRate: Double,
+      channelCount: Double,
+      promise: Promise,
+  ) {
+    executor.execute {
+      try {
+        if (!hasMicPermission()) {
+          promise.reject("NO_PERMISSION", "RECORD_AUDIO is not granted")
+          return@execute
+        }
+        val device = findInput(deviceId.toInt())
+        if (device == null) {
+          promise.reject("DEVICE_NOT_FOUND", "Input device ${deviceId.toInt()} is not connected")
+          return@execute
+        }
+        meter.stop()
+        val file = File(getReactApplicationContext().cacheDir, "audio_${System.currentTimeMillis()}.wav")
+        promise.resolve(
+            fileRecorder.start(device, file, sampleRate.toInt(), channelCount.toInt()).toString()
+        )
+      } catch (e: Exception) {
+        promise.reject("AUDIO_ERROR", e.message ?: "Could not start the audio recording")
+      }
+    }
+  }
+
+  override fun stopAudioCapture(promise: Promise) {
+    executor.execute {
+      try {
+        promise.resolve(fileRecorder.stop().toString())
+      } catch (e: Exception) {
+        promise.reject("AUDIO_ERROR", e.message ?: "Could not stop the audio recording")
+      }
+    }
+  }
+
+  override fun mergeRecording(
+      videoPath: String,
+      audioPath: String,
+      videoStartUs: Double,
+      audioStartUs: Double,
+      videoLatencyMs: Double,
+      promise: Promise,
+  ) {
+    executor.execute {
+      try {
+        val cache = getReactApplicationContext().cacheDir.canonicalPath
+        val video = File(videoPath)
+        val audio = File(audioPath)
+        // Only files this app created in its own cache folder may be merged.
+        if (!video.exists() || !audio.exists() ||
+            video.parentFile?.canonicalPath != cache ||
+            audio.parentFile?.canonicalPath != cache) {
+          promise.reject("FILE_NOT_FOUND", "Recording files not found")
+          return@execute
+        }
+        val out = File(getReactApplicationContext().cacheDir, "av_${System.currentTimeMillis()}.mp4")
+        val result =
+            AvMerger.merge(
+                videoPath,
+                audioPath,
+                out,
+                videoStartUs.toLong(),
+                audioStartUs.toLong(),
+                videoLatencyMs.toLong(),
+            )
+        promise.resolve(result.toString())
+      } catch (e: Exception) {
+        promise.reject("AUDIO_ERROR", e.message ?: "Merge failed")
+      }
+    }
+  }
+
   // ---- playback (to listen to a test recording) --------------------------------------------------
 
   override fun playTest(path: String, promise: Promise) {
@@ -266,6 +344,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
   }
 
   override fun invalidate() {
+    fileRecorder.stop()
     meter.stop()
     stopPlayerLocked()
     executor.shutdownNow()

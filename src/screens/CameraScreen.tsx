@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
+import { RecordingPanel } from '../components/RecordingPanel';
 import { YiLivePreview } from '../components/YiLivePreview';
+import { useCombinedRecording } from '../hooks/useCombinedRecording';
 import { useYiActivation, type YiState } from '../hooks/useYiActivation';
 import { isYiControlAvailable } from '../native/yiControl';
 import { colors } from '../theme/colors';
@@ -54,6 +56,16 @@ export function CameraScreen() {
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(DEFAULT_YI_RTSP_URL);
   const { state, activate, deactivate } = useYiActivation();
+  const rec = useCombinedRecording();
+  const { abort } = rec;
+  const cameraActive = state.kind === 'active';
+
+  // If the camera connection drops during a recording, stop everything and say so.
+  useEffect(() => {
+    if (!cameraActive) {
+      abort('Koneksi kamera terputus, rekaman dihentikan.');
+    }
+  }, [cameraActive, abort]);
 
   const urlError = validateRtspUrl(url);
   const host = extractRtspHost(url);
@@ -81,7 +93,15 @@ export function CameraScreen() {
       <BrandHeader />
 
       {state.kind === 'active' && host !== null ? (
-        <YiLivePreview source={url.trim()} />
+        <>
+          <YiLivePreview
+            source={url.trim()}
+            recording={rec.videoRecording}
+            onVideoReady={rec.setVideoReady}
+            onRecordingEvent={rec.onVideoEvent}
+          />
+          <RecordingPanel rec={rec} />
+        </>
       ) : (
         <View style={styles.preview}>
           <Text style={styles.previewTitle}>Pratinjau kamera belum aktif</Text>
