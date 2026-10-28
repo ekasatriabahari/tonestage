@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { type MeterState, nextMeterState } from '../native/audioMeter';
+import { type MeterState, nextMeterState, resetClipping } from '../native/audioMeter';
 import {
   lastBackingFile,
   listBackingOutputs,
@@ -141,6 +141,10 @@ export function useBackingTrack(active: boolean) {
     [status, loaded],
   );
 
+  const resetClip = useCallback(() => {
+    setMeter(prev => (prev === null ? prev : resetClipping(prev)));
+  }, []);
+
   const setVolume = useCallback((v: number) => setVolumeState(clampVolume(v)), []);
   const toggleMute = useCallback(() => setMuted(m => !m), []);
 
@@ -172,6 +176,7 @@ export function useBackingTrack(active: boolean) {
     seekBy,
     setVolume,
     toggleMute,
+    resetClip,
     selectOutput,
   };
 }

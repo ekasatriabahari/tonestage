@@ -176,9 +176,9 @@ export function BackingTrackScreen({ active }: Props) {
             <Text style={[styles.chipText, bt.muted && styles.chipTextOn]}>{bt.muted ? 'Mute: aktif' : 'Mute: mati'}</Text>
           </Pressable>
         </View>
-        <MeterBars meter={bt.meter} />
+        <MeterBars meter={bt.meter} onReset={bt.resetClip} />
         <Text style={styles.note}>
-          Level diukur pada sinyal yang dikirim ke output setelah volume dan mute diterapkan.
+          Level diukur pada sinyal yang dikirim ke output setelah volume dan mute diterapkan. Batang merah berarti puncak di atas -3 dBFS (konvensi tampilan). "Sampel di batas penuh" menghitung sampel yang tepat di 0 dBFS dan terus bertambah sampai Anda menekan Reset.
         </Text>
       </View>
 

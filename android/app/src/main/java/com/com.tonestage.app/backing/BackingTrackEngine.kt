@@ -346,6 +346,7 @@ internal class BackingTrackEngine(private val context: Context) {
       extractor.setDataSource(context, source, null)
       var format: MediaFormat? = null
       var mime = ""
+      var trackIndex = -1
       for (i in 0 until extractor.trackCount) {
         val candidate = extractor.getTrackFormat(i)
         val candidateMime = candidate.getString(MediaFormat.KEY_MIME) ?: ""
@@ -353,6 +354,7 @@ internal class BackingTrackEngine(private val context: Context) {
           extractor.selectTrack(i)
           format = candidate
           mime = candidateMime
+          trackIndex = i
           break
         }
       }
@@ -371,10 +373,7 @@ internal class BackingTrackEngine(private val context: Context) {
           throw BackingException("UNSUPPORTED_WAV_FORMAT")
         }
       } else {
-        val decoder = MediaCodec.createDecoderByType(mime)
-        decoder.configure(chosen, null, null, 0)
-        decoder.start()
-        codec = decoder
+        codec = startDecoder(mime, chosen, trackIndex)
       }
       synchronized(lock) { stats = ChannelStats(channels) }
       liveRate = rate
@@ -382,6 +381,30 @@ internal class BackingTrackEngine(private val context: Context) {
       if (startUs > 0) {
         extractor.seekTo(startUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
       }
+    }
+
+    /**
+     * Starts a decoder that is asked for float output. Hot masters often decode to values slightly
+     * above full scale; a float pipeline keeps them until the volume has been applied, whereas
+     * 16-bit output would already have flattened the peaks. If the codec does not accept the
+     * request, the plain (16-bit) configuration is used.
+     */
+    private fun startDecoder(mime: String, format: MediaFormat, trackIndex: Int): MediaCodec {
+      val requested = MediaCodec.createDecoderByType(mime)
+      try {
+        format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_FLOAT)
+        requested.configure(format, null, null, 0)
+        requested.start()
+        return requested
+      } catch (e: Exception) {
+        try {
+          requested.release()
+        } catch (ignored: Exception) {}
+      }
+      val plain = MediaCodec.createDecoderByType(mime)
+      plain.configure(extractor.getTrackFormat(trackIndex), null, null, 0)
+      plain.start()
+      return plain
     }
 
     fun seek(us: Long) {
@@ -518,27 +541,28 @@ internal class BackingTrackEngine(private val context: Context) {
     /** Converts decoded bytes to 16-bit samples, applies volume/mute and measures the levels. */
     private fun makeChunk(data: ByteBuffer, presentationUs: Long) {
       data.order(ByteOrder.LITTLE_ENDIAN)
+      val factor = if (muted) 0f else gain
       val samples: ShortArray
       if (encoding == AudioFormat.ENCODING_PCM_FLOAT) {
+        // Volume is applied in float, before anything is clamped to 16 bits.
         val floats = data.asFloatBuffer()
         samples = ShortArray(floats.remaining())
         for (i in samples.indices) {
-          samples[i] = (floats.get(i) * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+          samples[i] = (floats.get(i) * factor * 32767f).toInt().coerceIn(-32768, 32767).toShort()
         }
       } else {
         val shorts = data.asShortBuffer()
         samples = ShortArray(shorts.remaining())
         shorts.get(samples)
+        if (factor != 1f) {
+          for (i in samples.indices) {
+            samples[i] = (samples[i] * factor).toInt().coerceIn(-32768, 32767).toShort()
+          }
+        }
       }
       val usable = samples.size - samples.size % channels
       if (usable <= 0) {
         return
-      }
-      val factor = if (muted) 0f else gain
-      if (factor != 1f) {
-        for (i in 0 until usable) {
-          samples[i] = (samples[i] * factor).toInt().coerceIn(-32768, 32767).toShort()
-        }
       }
       synchronized(lock) { stats?.add(samples, 0, usable) }
       if (needBase) {

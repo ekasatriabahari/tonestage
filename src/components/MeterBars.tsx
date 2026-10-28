@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   clipCount,
   levelFraction,
@@ -37,7 +37,13 @@ function Bar({ label, channel }: { label: string; channel: MeterChannel }) {
 }
 
 /** Level bars (peak, held peak, clipping) for any source that produces a MeterState. */
-export function MeterBars({ meter }: { meter: MeterState | null }) {
+export function MeterBars({
+  meter,
+  onReset,
+}: {
+  meter: MeterState | null;
+  onReset?: () => void;
+}) {
   if (meter === null || meter.channels.length === 0) {
     return null;
   }
@@ -47,9 +53,16 @@ export function MeterBars({ meter }: { meter: MeterState | null }) {
       {meter.channels.map((c, i) => (
         <Bar key={i} label={`K${i + 1}`} channel={c} />
       ))}
-      <Text style={[styles.clip, clips > 0 && styles.clipHot]}>
-        {clips > 0 ? `CLIPPING: ${clips} sampel` : 'Tidak ada clipping'}
-      </Text>
+      <View style={styles.clipRow}>
+        <Text style={[styles.clip, clips > 0 && styles.clipHot]}>
+          {clips > 0 ? `Sampel di batas penuh: ${clips} (sejak mulai/reset)` : 'Tidak ada sampel di batas penuh'}
+        </Text>
+        {clips > 0 && onReset !== undefined ? (
+          <Pressable onPress={onReset} accessibilityRole="button" style={styles.resetButton}>
+            <Text style={styles.resetText}>Reset</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -68,6 +81,9 @@ const styles = StyleSheet.create({
   fill: { position: 'absolute', top: 0, bottom: 0, left: 0 },
   hold: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: colors.ink },
   value: { color: colors.inkMuted, fontSize: 12, width: 78, textAlign: 'right' },
-  clip: { color: colors.inkMuted, fontSize: 12 },
+  clipRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  clip: { color: colors.inkMuted, fontSize: 12, flexShrink: 1 },
+  resetButton: { borderColor: colors.record, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 },
+  resetText: { color: colors.record, fontSize: 12, fontWeight: '700' },
   clipHot: { color: colors.record, fontWeight: '700' },
 });
