@@ -25,6 +25,11 @@ class YiVideoViewManager :
     view.setSource(value)
   }
 
+  @ReactProp(name = "recording")
+  override fun setRecording(view: YiVideoView, value: Boolean) {
+    view.setRecording(value)
+  }
+
   override fun onDropViewInstance(view: YiVideoView) {
     view.release()
     super.onDropViewInstance(view)

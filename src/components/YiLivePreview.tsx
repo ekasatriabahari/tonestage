@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  type NativeSyntheticEvent,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { type NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
 import YiVideoView from '../../specs/YiVideoViewNativeComponent';
 import {
+  describeRecordingError,
   describeVideoError,
   parsePlayerEvent,
+  parseRecordingStats,
   previewAspectRatio,
   type PlayerStatePayload,
+  type RecordingEvent,
   type VideoState,
 } from '../native/yiVideo';
 import { colors } from '../theme/colors';
@@ -20,10 +18,22 @@ import { colors } from '../theme/colors';
 const MAX_AUTO_RETRIES = 1;
 const RETRY_DELAY_MS = 1500;
 
-type Props = { source: string };
+type Props = {
+  source: string;
+  /** true: save the incoming video to an MP4; false: stop. */
+  recording?: boolean;
+  /** Tells the parent whether real video frames are being shown. */
+  onVideoReady?: (ready: boolean) => void;
+  onRecordingEvent?: (event: RecordingEvent) => void;
+};
 
 /** Live preview. Mount it only while the camera control connection is active. */
-export function YiLivePreview({ source }: Props) {
+export function YiLivePreview({
+  source,
+  recording = false,
+  onVideoReady,
+  onRecordingEvent,
+}: Props) {
   const [video, setVideo] = useState<VideoState>({ kind: 'preparing' });
   const [attempt, setAttempt] = useState(0);
 
@@ -38,11 +48,37 @@ export function YiLivePreview({ source }: Props) {
     return () => clearTimeout(id);
   }, [video.kind, attempt]);
 
+  useEffect(() => {
+    onVideoReady?.(video.kind === 'playing');
+  }, [video.kind, onVideoReady]);
+
+  useEffect(() => {
+    return () => onVideoReady?.(false);
+  }, [onVideoReady]);
+
   const onPlayerState = useCallback(
     (event: NativeSyntheticEvent<PlayerStatePayload>) => {
-      setVideo(parsePlayerEvent(event.nativeEvent));
+      const payload = event.nativeEvent;
+      if (payload.state === 'recording') {
+        onRecordingEvent?.({ kind: 'started' });
+        return;
+      }
+      if (payload.state === 'recorded') {
+        try {
+          const stats = parseRecordingStats(payload.message);
+          onRecordingEvent?.(
+            stats.ok
+              ? { kind: 'finished', stats }
+              : { kind: 'failed', message: describeRecordingError(stats.error) },
+          );
+        } catch {
+          onRecordingEvent?.({ kind: 'failed', message: 'Hasil rekaman video tidak dapat dibaca.' });
+        }
+        return;
+      }
+      setVideo(parsePlayerEvent(payload));
     },
-    [],
+    [onRecordingEvent],
   );
 
   const willRetry = video.kind === 'error' && attempt < MAX_AUTO_RETRIES;
@@ -52,6 +88,7 @@ export function YiLivePreview({ source }: Props) {
       <YiVideoView
         key={attempt}
         source={source}
+        recording={recording}
         onPlayerState={onPlayerState}
         style={styles.fill}
       />
@@ -71,9 +108,10 @@ export function YiLivePreview({ source }: Props) {
       ) : null}
       {video.kind === 'playing' ? (
         <View style={styles.badge}>
-          <View style={styles.badgeDot} />
+          <View style={[styles.badgeDot, recording && styles.badgeDotRec]} />
           <Text style={styles.badgeText}>
             {video.width > 0 ? `Langsung ${video.width}x${video.height}` : 'Langsung'}
+            {recording ? '  REC' : ''}
           </Text>
         </View>
       ) : null}
@@ -105,12 +143,7 @@ const styles = StyleSheet.create({
   },
   overlayText: { color: colors.inkMuted, fontSize: 14, textAlign: 'center' },
   overlayTitle: { color: colors.ink, fontSize: 16, fontWeight: '600' },
-  overlayError: {
-    color: colors.danger,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  overlayError: { color: colors.danger, fontSize: 13, textAlign: 'center', lineHeight: 18 },
   overlayCode: { color: colors.inkMuted, fontSize: 11, textAlign: 'center' },
   badge: {
     position: 'absolute',
@@ -124,11 +157,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  badgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.record,
-  },
+  badgeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
+  badgeDotRec: { backgroundColor: colors.record },
   badgeText: { color: colors.ink, fontSize: 12, fontWeight: '600' },
 });

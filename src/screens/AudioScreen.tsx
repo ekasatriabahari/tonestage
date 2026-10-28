@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
+import { LevelMeterPanel } from '../components/LevelMeterPanel';
 import { SpmTestPanel } from '../components/SpmTestPanel';
 import { useAudioInputs } from '../hooks/useAudioInputs';
 import {
@@ -111,6 +112,7 @@ export function AudioScreen({ active }: Props) {
         usb.map(d => (
           <View key={d.id} style={styles.usbGroup}>
             <DeviceCard device={d} />
+            <LevelMeterPanel device={d} active={active} />
             <SpmTestPanel device={d} />
           </View>
         ))
@@ -123,7 +125,14 @@ export function AudioScreen({ active }: Props) {
       {other.length === 0 ? (
         <Text style={styles.helpText}>Tidak ada.</Text>
       ) : (
-        other.map(d => <DeviceCard key={d.id} device={d} />)
+        other.map(d => (
+          <View key={d.id} style={styles.usbGroup}>
+            <DeviceCard device={d} />
+            {d.type === 'BUILTIN_MIC' ? (
+              <LevelMeterPanel device={d} active={active} testOnly />
+            ) : null}
+          </View>
+        ))
       )}
 
       <Pressable onPress={refresh} accessibilityRole="button" style={styles.refreshButton}>

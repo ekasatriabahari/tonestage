@@ -5,21 +5,24 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { AudioScreen } from './src/screens/AudioScreen';
+import { BackingTrackScreen } from './src/screens/BackingTrackScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { colors } from './src/theme/colors';
 
-type Tab = 'camera' | 'audio';
+type Tab = 'camera' | 'audio' | 'backing';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'camera', label: 'Kamera' },
   { id: 'audio', label: 'Audio' },
+  { id: 'backing', label: 'Backing' },
 ];
 
 function Shell() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('camera');
 
-  // Both screens stay mounted: leaving the camera tab must not close the camera connection.
+  // All screens stay mounted: leaving the camera tab must not close the camera connection,
+  // and the backing track keeps playing while another tab is shown.
   return (
     <View style={styles.root}>
       <View style={[styles.pane, tab !== 'camera' && styles.hidden]}>
@@ -27,6 +30,9 @@ function Shell() {
       </View>
       <View style={[styles.pane, tab !== 'audio' && styles.hidden]}>
         <AudioScreen active={tab === 'audio'} />
+      </View>
+      <View style={[styles.pane, tab !== 'backing' && styles.hidden]}>
+        <BackingTrackScreen active={tab === 'backing'} />
       </View>
       <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }]}>
         {TABS.map(t => (
