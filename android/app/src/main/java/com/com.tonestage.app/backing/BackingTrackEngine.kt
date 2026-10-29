@@ -41,6 +41,10 @@ internal class BackingTrackEngine(private val context: Context) {
   @Volatile private var error = ""
   @Volatile private var gain = 1.0f
   @Volatile private var muted = false
+  @Volatile private var masterGain = 1.0f
+  @Volatile private var eqSettings = EqSettings(false, emptyList())
+  @Volatile private var eqVersion = 0
+  @Volatile private var liveFramesWritten = 0L
   @Volatile private var requestedDevice: AudioDeviceInfo? = null
   @Volatile private var stopFlag = false
   @Volatile private var wantPaused = false
@@ -196,6 +200,16 @@ internal class BackingTrackEngine(private val context: Context) {
     }
   }
 
+  fun setMasterGain(volume: Float) {
+    masterGain = volume.coerceIn(0f, 1f)
+  }
+
+  /** Equalizer for the backing track only. The guitar recording is never filtered. */
+  fun setEq(settings: EqSettings) {
+    eqSettings = settings
+    eqVersion++
+  }
+
   fun setGain(volume: Float, isMuted: Boolean) {
     gain = volume.coerceIn(0f, 1f)
     muted = isMuted
@@ -225,6 +239,7 @@ internal class BackingTrackEngine(private val context: Context) {
     var anchorNanoUs = 0L
     var routedId = -1
     var routedName = ""
+    var latencyMs = -1.0
     if (track != null && rate > 0) {
       try {
         val head = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
@@ -233,6 +248,10 @@ internal class BackingTrackEngine(private val context: Context) {
           hasAnchor = true
           anchorNanoUs = timestamp.nanoTime / 1000
           anchorFileUs = (baseFrame + timestamp.framePosition) * 1_000_000L / rate
+          // When the frame written last will be heard, minus now: buffered frames + system delay.
+          latencyMs =
+              (timestamp.nanoTime - System.nanoTime()) / 1_000_000.0 +
+                  (liveFramesWritten - timestamp.framePosition) * 1000.0 / rate
         }
         val routed = track.routedDevice
         if (routed != null) {
@@ -253,6 +272,7 @@ internal class BackingTrackEngine(private val context: Context) {
     json.put("routedDeviceId", routedId)
     json.put("routedDeviceName", routedName)
     json.put("requestedDeviceId", requestedDevice?.id ?: -1)
+    json.put("outputLatencyMs", latencyMs)
     synchronized(lock) {
       val current = stats
       if (current != null) {
@@ -339,6 +359,8 @@ internal class BackingTrackEngine(private val context: Context) {
     private var pending: ShortArray? = null
     private var pendingPos = 0
     private var framesWritten = 0L
+    private var eq: BiquadEq? = null
+    private var eqApplied = -1
     private val info = MediaCodec.BufferInfo()
     private val rawBuffer = ByteBuffer.allocate(32 * 1024)
 
@@ -417,6 +439,7 @@ internal class BackingTrackEngine(private val context: Context) {
       pendingPos = 0
       needBase = true
       framesWritten = 0L
+      liveFramesWritten = 0L
     }
 
     fun pauseTrack() {
@@ -532,8 +555,10 @@ internal class BackingTrackEngine(private val context: Context) {
         synchronized(lock) { stats = ChannelStats(channels) }
         liveRate = rate
         liveChannels = channels
+        eq = null
         needBase = true
         framesWritten = 0L
+        liveFramesWritten = 0L
       }
       encoding = newEncoding
     }
@@ -541,22 +566,60 @@ internal class BackingTrackEngine(private val context: Context) {
     /** Converts decoded bytes to 16-bit samples, applies volume/mute and measures the levels. */
     private fun makeChunk(data: ByteBuffer, presentationUs: Long) {
       data.order(ByteOrder.LITTLE_ENDIAN)
-      val factor = if (muted) 0f else gain
+      val factor = if (muted) 0f else gain * masterGain
+      val settings = eqSettings
+      val eqActive = settings.enabled && settings.bands.any { it.enabled }
       val samples: ShortArray
-      if (encoding == AudioFormat.ENCODING_PCM_FLOAT) {
-        // Volume is applied in float, before anything is clamped to 16 bits.
-        val floats = data.asFloatBuffer()
-        samples = ShortArray(floats.remaining())
-        for (i in samples.indices) {
-          samples[i] = (floats.get(i) * factor * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+      if (eqActive) {
+        // Equalizer path: everything in float, volume applied before the final conversion.
+        val floats: FloatArray
+        if (encoding == AudioFormat.ENCODING_PCM_FLOAT) {
+          val source = data.asFloatBuffer()
+          floats = FloatArray(source.remaining())
+          source.get(floats)
+        } else {
+          val source = data.asShortBuffer()
+          floats = FloatArray(source.remaining())
+          for (i in floats.indices) {
+            floats[i] = source.get(i) / 32768f
+          }
+        }
+        val whole = floats.size - floats.size % channels
+        if (whole <= 0) {
+          return
+        }
+        var filter = eq
+        if (filter == null) {
+          filter = BiquadEq(rate, channels)
+          eq = filter
+          eqApplied = -1
+        }
+        if (eqApplied != eqVersion) {
+          filter.configure(settings)
+          eqApplied = eqVersion
+        }
+        filter.process(floats, whole)
+        samples = ShortArray(whole)
+        for (i in 0 until whole) {
+          samples[i] = (floats[i] * factor * 32768f).toInt().coerceIn(-32768, 32767).toShort()
         }
       } else {
-        val shorts = data.asShortBuffer()
-        samples = ShortArray(shorts.remaining())
-        shorts.get(samples)
-        if (factor != 1f) {
+        eq = null
+        if (encoding == AudioFormat.ENCODING_PCM_FLOAT) {
+          // Volume is applied in float, before anything is clamped to 16 bits.
+          val floats = data.asFloatBuffer()
+          samples = ShortArray(floats.remaining())
           for (i in samples.indices) {
-            samples[i] = (samples[i] * factor).toInt().coerceIn(-32768, 32767).toShort()
+            samples[i] = (floats.get(i) * factor * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+          }
+        } else {
+          val shorts = data.asShortBuffer()
+          samples = ShortArray(shorts.remaining())
+          shorts.get(samples)
+          if (factor != 1f) {
+            for (i in samples.indices) {
+              samples[i] = (samples[i] * factor).toInt().coerceIn(-32768, 32767).toShort()
+            }
           }
         }
       }
@@ -589,6 +652,7 @@ internal class BackingTrackEngine(private val context: Context) {
       }
       pendingPos += written
       framesWritten += written / channels
+      liveFramesWritten = framesWritten
       if (pendingPos >= chunk.size) {
         pending = null
         pendingPos = 0

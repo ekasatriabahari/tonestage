@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type MeterState, nextMeterState, resetClipping } from '../native/audioMeter';
 import {
   lastBackingFile,
   listBackingOutputs,
   loadBackingTrack,
+  loadMixerJson,
   pauseBacking,
   pickBackingFile,
   playBacking,
   readBackingStatus,
+  saveMixerJson,
   seekBacking,
+  setBackingEq,
   setBackingGain,
+  setBackingMaster,
   setBackingOutput,
   stopBacking,
 } from '../native/backingTrack';
@@ -21,13 +25,18 @@ import {
   type OutputDevice,
   statusToMeterSnapshot,
 } from '../native/backingTrackLogic';
+import { type EqSettings, serializeEq } from '../native/eq';
+import { averageLatency, pushLatency } from '../native/mixerLogic';
+import { DEFAULT_MIXER, parseMixerSettings, serializeMixerSettings } from '../native/mixerSettings';
 
 const STATUS_POLL_MS = 150;
 const DEVICE_POLL_MS = 2000;
+const SAVE_DELAY_MS = 600;
 
 /**
- * State for the backing-track screen. Playback itself lives in native code and keeps running
- * when the screen is hidden; this hook only reads the status while `active` is true.
+ * State for the backing track and the mixer settings. Playback itself lives in native code and
+ * keeps running when a screen is hidden; this hook only reads the status while `active` is true.
+ * Mixer settings are saved on the phone and restored the next time the app starts.
  */
 export function useBackingTrack(active: boolean) {
   const [loaded, setLoaded] = useState<LoadedTrack | null>(null);
@@ -35,14 +44,36 @@ export function useBackingTrack(active: boolean) {
   const [status, setStatus] = useState<BackingStatus | null>(null);
   const [devices, setDevices] = useState<OutputDevice[]>([]);
   const [outputId, setOutputId] = useState(-1);
-  const [volume, setVolumeState] = useState(0.8);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolumeState] = useState(DEFAULT_MIXER.backingVolume);
+  const [muted, setMuted] = useState(DEFAULT_MIXER.backingMuted);
+  const [masterVolume, setMasterVolumeState] = useState(DEFAULT_MIXER.masterVolume);
+  const [guitarVolume, setGuitarVolumeState] = useState(DEFAULT_MIXER.guitarVolume);
+  const [guitarMuted, setGuitarMuted] = useState(DEFAULT_MIXER.guitarMuted);
+  const [eq, setEqState] = useState<EqSettings>(DEFAULT_MIXER.eq);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [meter, setMeter] = useState<MeterState | null>(null);
+  const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     lastBackingFile().then(setLastFile);
+  }, []);
+
+  // Restore the saved mixer settings once.
+  useEffect(() => {
+    loadMixerJson().then(json => {
+      if (json !== null && json !== '') {
+        const saved = parseMixerSettings(json);
+        setVolumeState(saved.backingVolume);
+        setMuted(saved.backingMuted);
+        setMasterVolumeState(saved.masterVolume);
+        setGuitarVolumeState(saved.guitarVolume);
+        setGuitarMuted(saved.guitarMuted);
+        setEqState(saved.eq);
+      }
+      setSettingsLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -51,9 +82,15 @@ export function useBackingTrack(active: boolean) {
     }
     const poll = async () => {
       const s = await readBackingStatus();
-      if (s !== null) {
-        setStatus(s);
-        setMeter(prev => nextMeterState(prev, statusToMeterSnapshot(s), Date.now()));
+      if (s === null) {
+        return;
+      }
+      setStatus(s);
+      setMeter(prev => nextMeterState(prev, statusToMeterSnapshot(s), Date.now()));
+      if (s.state === 'playing') {
+        setLatencyHistory(prev => pushLatency(prev, s.outputLatencyMs));
+      } else if (s.state !== 'paused') {
+        setLatencyHistory(prev => (prev.length === 0 ? prev : []));
       }
     };
     poll();
@@ -76,10 +113,38 @@ export function useBackingTrack(active: boolean) {
     return () => clearInterval(id);
   }, [active]);
 
-  // Volume and mute are applied in native code whenever they change or a file is loaded.
+  // Volume, mute, master and EQ are applied in native code whenever they change or a file is loaded.
   useEffect(() => {
     setBackingGain(volume, muted);
   }, [volume, muted, loaded]);
+
+  useEffect(() => {
+    setBackingMaster(masterVolume);
+  }, [masterVolume, loaded]);
+
+  useEffect(() => {
+    setBackingEq(serializeEq(eq));
+  }, [eq, loaded]);
+
+  // Save the settings shortly after the last change (not before the saved ones were restored).
+  useEffect(() => {
+    if (!settingsLoaded) {
+      return undefined;
+    }
+    const id = setTimeout(() => {
+      saveMixerJson(
+        serializeMixerSettings({
+          backingVolume: volume,
+          backingMuted: muted,
+          masterVolume,
+          guitarVolume,
+          guitarMuted,
+          eq,
+        }),
+      );
+    }, SAVE_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [settingsLoaded, volume, muted, masterVolume, guitarVolume, guitarMuted, eq]);
 
   const loadFromUri = useCallback(async (uri: string) => {
     const result = await loadBackingTrack(uri);
@@ -141,12 +206,16 @@ export function useBackingTrack(active: boolean) {
     [status, loaded],
   );
 
+  const setVolume = useCallback((v: number) => setVolumeState(clampVolume(v)), []);
+  const setMasterVolume = useCallback((v: number) => setMasterVolumeState(clampVolume(v)), []);
+  const setGuitarVolume = useCallback((v: number) => setGuitarVolumeState(clampVolume(v)), []);
+  const toggleMute = useCallback(() => setMuted(m => !m), []);
+  const toggleGuitarMute = useCallback(() => setGuitarMuted(m => !m), []);
+  const setEq = useCallback((next: EqSettings) => setEqState(next), []);
+
   const resetClip = useCallback(() => {
     setMeter(prev => (prev === null ? prev : resetClipping(prev)));
   }, []);
-
-  const setVolume = useCallback((v: number) => setVolumeState(clampVolume(v)), []);
-  const toggleMute = useCallback(() => setMuted(m => !m), []);
 
   const selectOutput = useCallback(async (id: number) => {
     if (await setBackingOutput(id)) {
@@ -156,6 +225,8 @@ export function useBackingTrack(active: boolean) {
     }
   }, []);
 
+  const avgLatency = useMemo(() => averageLatency(latencyHistory), [latencyHistory]);
+
   return {
     loaded,
     lastFile,
@@ -164,6 +235,11 @@ export function useBackingTrack(active: boolean) {
     outputId,
     volume,
     muted,
+    masterVolume,
+    guitarVolume,
+    guitarMuted,
+    eq,
+    avgLatency,
     meter,
     message,
     busy,
@@ -175,8 +251,14 @@ export function useBackingTrack(active: boolean) {
     seekTo,
     seekBy,
     setVolume,
+    setMasterVolume,
+    setGuitarVolume,
+    setEq,
     toggleMute,
+    toggleGuitarMute,
     resetClip,
     selectOutput,
   };
 }
+
+export type BackingTrack = ReturnType<typeof useBackingTrack>;

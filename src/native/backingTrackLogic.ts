@@ -33,6 +33,8 @@ export type BackingStatus = {
   routedDeviceId: number;
   routedDeviceName: string;
   requestedDeviceId: number;
+  /** Estimated delay from writing a frame to hearing it (ms); -1 when unknown. */
+  outputLatencyMs: number;
 };
 
 export type OutputDevice = {
@@ -95,6 +97,7 @@ export function parseBackingStatus(json: string): BackingStatus {
     routedDeviceId: typeof e.routedDeviceId === 'number' ? e.routedDeviceId : -1,
     routedDeviceName: str(e.routedDeviceName),
     requestedDeviceId: typeof e.requestedDeviceId === 'number' ? e.requestedDeviceId : -1,
+    outputLatencyMs: typeof e.outputLatencyMs === 'number' ? e.outputLatencyMs : -1,
   };
 }
 

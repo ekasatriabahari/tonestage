@@ -89,6 +89,22 @@ export const seekBacking = (positionMs: number) => call(m => m.seekTo(positionMs
 export const setBackingGain = (volume: number, muted: boolean) => call(m => m.setGain(volume, muted));
 export const setBackingOutput = (deviceId: number) => call(m => m.setOutputDevice(deviceId));
 export const unloadBacking = () => call(m => m.unload());
+export const setBackingMaster = (volume: number) => call(m => m.setMasterGain(volume));
+export const setBackingEq = (json: string) => call(m => m.setEq(json));
+
+/** The saved mixer settings: '' when none were saved, null when they cannot be read. */
+export async function loadMixerJson(): Promise<string | null> {
+  if (NativeBackingTrack == null) {
+    return null;
+  }
+  try {
+    return await NativeBackingTrack.loadSettings();
+  } catch {
+    return null;
+  }
+}
+
+export const saveMixerJson = (json: string) => call(m => m.saveSettings(json));
 
 /** Null when the status cannot be read. */
 export async function readBackingStatus(): Promise<BackingStatus | null> {

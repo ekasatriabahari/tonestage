@@ -4,22 +4,27 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { useBackingTrack } from './src/hooks/useBackingTrack';
 import { AudioScreen } from './src/screens/AudioScreen';
 import { BackingTrackScreen } from './src/screens/BackingTrackScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
+import { MixerScreen } from './src/screens/MixerScreen';
 import { colors } from './src/theme/colors';
 
-type Tab = 'camera' | 'audio' | 'backing';
+type Tab = 'camera' | 'audio' | 'backing' | 'mixer';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'camera', label: 'Kamera' },
   { id: 'audio', label: 'Audio' },
   { id: 'backing', label: 'Backing' },
+  { id: 'mixer', label: 'Mixer' },
 ];
 
 function Shell() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('camera');
+  // One backing-track state shared by the Backing and Mixer tabs.
+  const backing = useBackingTrack(tab === 'backing' || tab === 'mixer');
 
   // All screens stay mounted: leaving the camera tab must not close the camera connection,
   // and the backing track keeps playing while another tab is shown.
@@ -32,7 +37,10 @@ function Shell() {
         <AudioScreen active={tab === 'audio'} />
       </View>
       <View style={[styles.pane, tab !== 'backing' && styles.hidden]}>
-        <BackingTrackScreen active={tab === 'backing'} />
+        <BackingTrackScreen bt={backing} />
+      </View>
+      <View style={[styles.pane, tab !== 'mixer' && styles.hidden]}>
+        <MixerScreen bt={backing} active={tab === 'mixer'} />
       </View>
       <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }]}>
         {TABS.map(t => (
