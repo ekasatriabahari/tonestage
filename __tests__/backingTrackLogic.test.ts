@@ -16,17 +16,17 @@ import {
 const STATUS = {
   state: 'playing', error: '', name: 'song.mp3', durationMs: 200000, positionMs: 31000, sampleRate: 44100, channels: 2,
   hasAnchor: true, anchorFileUs: 31000000, anchorNanoUs: 9000000, frames: 6615, peaks: [0.5, 0.4], rms: [0.1, 0.09],
-  clippedTotal: [0, 0], routedDeviceId: 12, routedDeviceName: 'Speaker', requestedDeviceId: -1,
+  clippedTotal: [0, 0], routedDeviceId: 12, routedDeviceName: 'Speaker', requestedDeviceId: -1, outputLatencyMs: 187.5,
 };
 
 describe('parsing', () => {
   it('keeps measured status values', () => {
-    expect(parseBackingStatus(JSON.stringify(STATUS))).toMatchObject({ state: 'playing', positionMs: 31000, hasAnchor: true, anchorFileUs: 31000000, routedDeviceId: 12 });
+    expect(parseBackingStatus(JSON.stringify(STATUS))).toMatchObject({ state: 'playing', positionMs: 31000, hasAnchor: true, anchorFileUs: 31000000, routedDeviceId: 12, outputLatencyMs: 187.5 });
   });
 
   it('never reports playing, an anchor or a route unless told so', () => {
     const empty = parseBackingStatus('{}');
-    expect(empty).toMatchObject({ state: 'idle', hasAnchor: false, positionMs: 0, routedDeviceId: -1, requestedDeviceId: -1 });
+    expect(empty).toMatchObject({ state: 'idle', hasAnchor: false, positionMs: 0, routedDeviceId: -1, requestedDeviceId: -1, outputLatencyMs: -1 });
     expect(parseBackingStatus(JSON.stringify({ state: 'flying' })).state).toBe('idle');
     expect(parseBackingStatus(JSON.stringify({ hasAnchor: 'yes' })).hasAnchor).toBe(false);
     expect(() => parseBackingStatus('nope')).toThrow();

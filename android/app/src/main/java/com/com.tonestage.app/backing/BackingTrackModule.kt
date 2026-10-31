@@ -188,6 +188,44 @@ class BackingTrackModule(reactContext: ReactApplicationContext) :
     promise.resolve(null)
   }
 
+  override fun setMasterGain(volume: Double, promise: Promise) {
+    engine.setMasterGain(volume.toFloat())
+    promise.resolve(null)
+  }
+
+  override fun setEq(json: String, promise: Promise) {
+    try {
+      val root = JSONObject(json)
+      val bands = ArrayList<EqBandSettings>()
+      val array = root.optJSONArray("bands") ?: JSONArray()
+      for (i in 0 until array.length()) {
+        val band = array.optJSONObject(i) ?: continue
+        bands.add(
+            EqBandSettings(
+                band.optString("kind", "peak"),
+                band.optBoolean("enabled", false),
+                band.optDouble("freq", 1000.0).toFloat(),
+                band.optDouble("gainDb", 0.0).toFloat(),
+                band.optDouble("q", 1.0).toFloat(),
+            )
+        )
+      }
+      engine.setEq(EqSettings(root.optBoolean("enabled", false), bands))
+      promise.resolve(null)
+    } catch (e: Exception) {
+      promise.reject("BAD_EQ", e.message ?: "Invalid equalizer settings")
+    }
+  }
+
+  override fun loadSettings(promise: Promise) {
+    promise.resolve(prefs().getString(PREF_MIXER, "") ?: "")
+  }
+
+  override fun saveSettings(json: String, promise: Promise) {
+    prefs().edit().putString(PREF_MIXER, json).apply()
+    promise.resolve(null)
+  }
+
   override fun unload(promise: Promise) {
     executor.execute {
       engine.unload()
@@ -273,5 +311,6 @@ class BackingTrackModule(reactContext: ReactApplicationContext) :
     private const val REQUEST_PICK = 7301
     private const val PREFS = "tonestage"
     private const val PREF_URI = "backing_track_uri"
+    private const val PREF_MIXER = "mixer_settings"
   }
 }

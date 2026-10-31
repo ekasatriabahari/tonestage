@@ -29,6 +29,19 @@ export interface Spec extends TurboModule {
   /** volume is 0.0 to 1.0 (linear). */
   setGain(volume: number, muted: boolean): Promise<void>;
 
+  /** Master volume for the backing-track output, 0.0 to 1.0 (linear), on top of setGain. */
+  setMasterGain(volume: number): Promise<void>;
+
+  /**
+   * Equalizer for the backing track only. JSON {enabled, bands: [{kind: 'hpf' | 'peak', enabled,
+   * freq, gainDb, q}]}. The guitar recording is never filtered.
+   */
+  setEq(json: string): Promise<void>;
+
+  /** Mixer settings saved by the app (opaque JSON string; empty if none). */
+  loadSettings(): Promise<string>;
+  saveSettings(json: string): Promise<void>;
+
   /** Current output devices as JSON [{id, name, type, isUsb, address}]. */
   getOutputDevices(): Promise<string>;
 
@@ -38,7 +51,7 @@ export interface Spec extends TurboModule {
   /**
    * JSON {state, error, name, durationMs, positionMs, sampleRate, channels, hasAnchor,
    * anchorFileUs, anchorNanoUs, frames, peaks, rms, clippedTotal, routedDeviceId,
-   * routedDeviceName, requestedDeviceId}. While playing, the file position at system time t
+   * routedDeviceName, requestedDeviceId, outputLatencyMs (-1 if unknown)}. While playing, the file position at system time t
    * (microseconds, System.nanoTime) is anchorFileUs + (t - anchorNanoUs) when hasAnchor.
    */
   getStatus(): Promise<string>;
