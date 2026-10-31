@@ -229,3 +229,4 @@ export function outputWarning(device: OutputDevice): string | null {
   }
   return null;
 }
+

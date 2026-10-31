@@ -1,97 +1,272 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# ToneStage
 
-# Getting Started
+**ToneStage** adalah aplikasi Android untuk membantu gitaris merekam permainan gitar dengan kombinasi video wireless dan audio dari audio interface.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Aplikasi ini dikembangkan menggunakan **React Native CLI** dan dirancang sebagai studio recording portable dengan konsep sederhana:
 
-## Step 1: Start Metro
+> **Camera + Guitar Audio + Backing Track → Recording**
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## 🎸 Fitur Utama
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### 📷 Wireless Camera
 
-```sh
-# Using npm
-npm start
+ToneStage dapat menggunakan kamera wireless sebagai sumber video.
 
-# OR using Yarn
-yarn start
+Saat ini pengembangan difokuskan pada:
+
+- **YI Action Cam Gen 1 Basic**
+- Live video melalui **RTSP**
+- Live preview langsung di aplikasi
+- Perekaman video ke penyimpanan lokal
+
+Arsitektur aplikasi dirancang agar di masa depan dapat mendukung sumber kamera wireless lainnya.
+
+### 🎵 Guitar Audio Recording
+
+Input gitar menggunakan:
+
+- **Sonicake Pocket Master (SPM)**
+- Terhubung langsung ke Android melalui USB
+- Digunakan sebagai USB audio interface
+- Audio direkam secara terpisah untuk menjaga kualitas sinyal gitar
+
+### 🎧 Backing Track
+
+Pengguna dapat memuat backing track secara terpisah dari perangkat.
+
+Konsep audio ToneStage:
+
+```text
+Guitar ──> Sonicake Pocket Master ──> Android
+                                            │
+Backing Track ──────────────────────────────┤
+                                            │
+                                     Mixer / Processing
+                                            │
+                                            ▼
+                                      Final Recording
 ```
 
-## Step 2: Build and run your app
+Pemisahan audio gitar dan backing track memungkinkan proses mixing dan pengolahan audio dilakukan dengan lebih fleksibel.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+### 🎚 Audio Processing
 
-### Android
+ToneStage sedang dikembangkan untuk mendukung pengolahan audio sebelum proses final mixing.
 
-```sh
-# Using npm
-npm run android
+Rencana fitur:
 
-# OR using Yarn
-yarn android
+- Frequency cut
+- High-pass filter
+- Parametric EQ
+- Pengaturan frekuensi gitar agar tidak bertabrakan dengan backing track
+- Mixer volume gitar dan backing track
+
+### 🎬 Audio & Video Synchronization
+
+Video dan audio direkam melalui sumber yang berbeda:
+
+```text
+YI Action Cam
+     │
+    RTSP
+     │
+     ▼
+  ToneStage
+     │
+     ├── Video Recording
+     │
+SPM ─┤
+     │
+     ├── Guitar Audio Recording
+     │
+Backing Track
+     │
+     ▼
+ Audio Processing & Mixing
+     │
+     ▼
+ Final Video Export
 ```
 
-### iOS
+Sinkronisasi audio dan video menjadi salah satu fokus utama pengembangan ToneStage.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+### 🖼 Picture-in-Picture
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+Direncanakan dukungan Android Picture-in-Picture (PiP).
 
-```sh
-bundle install
+Ketika aplikasi diminimalkan:
+
+- Hanya live preview kamera yang ditampilkan.
+- UI mixer dan kontrol aplikasi disembunyikan.
+- Koneksi RTSP diusahakan tetap aktif.
+- Sesi recording tidak boleh terganggu.
+
+---
+
+## 📱 Technology Stack
+
+| Technology | Usage |
+|---|---|
+| React Native CLI | Android application |
+| JavaScript | Main application language |
+| Android Native | Camera, audio, PiP, dan native integration |
+| RTSP | Wireless camera streaming |
+| Sonicake Pocket Master | USB guitar audio input |
+
+## 🛠 Development Setup
+
+### Requirements
+
+Pastikan environment React Native Android sudah tersedia:
+
+- Node.js `>= 22.11.0`
+- Android Studio
+- Android SDK
+- Java Development Kit (JDK)
+- Android device atau emulator
+
+### Installation
+
+Clone repository:
+
+```bash
+git clone <repository-url>
+cd tonestage
 ```
 
-Then, and every time you update your native dependencies, run:
+Install dependency:
 
-```sh
-bundle exec pod install
+```bash
+npm install
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Atau, jika project memiliki `package-lock.json` yang sesuai:
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+```bash
+npm ci
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Run Metro
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```bash
+npx react-native start
+```
 
-## Step 3: Modify your app
+Jika mengalami masalah cache:
 
-Now that you have successfully run the app, let's make changes!
+```bash
+npx react-native start --reset-cache
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### Run Android
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+Buka terminal baru:
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+```bash
+npx react-native run-android
+```
 
-## Congratulations! :tada:
+### Clean Android Build
 
-You've successfully run and modified your React Native App. :partying_face:
+Jika diperlukan:
 
-### Now what?
+```bash
+cd android
+gradlew.bat clean
+cd ..
+```
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+---
 
-# Troubleshooting
+## 📂 Project Status
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+### Completed / Working
 
-# Learn More
+- [x] React Native Android project setup
+- [x] RTSP streaming test
+- [x] Live video preview
+- [x] Keep Awake
+- [x] Video recording
+- [x] Save recorded video to local storage
+- [x] SPM audio recording test
+- [x] WAV output verification
 
-To learn more about React Native, take a look at the following resources:
+### In Development
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- [ ] Audio frequency cut / EQ
+- [ ] Local backing track loading
+- [ ] Guitar and backing track mixing
+- [ ] Audio-video synchronization
+- [ ] Final MP4 export
+- [ ] Picture-in-Picture live preview
+- [ ] Studio / mixer UI redesign
+- [ ] User guide screen
+
+### Future Plans
+
+- Support additional wireless cameras
+- Support other action cameras
+- Camera source selection
+- Audio input selection
+- Monitoring output selection
+- Advanced EQ presets
+- Guitar recording presets
+- Improved audio-video synchronization controls
+
+---
+
+## 🎯 Project Goal
+
+ToneStage is designed to make guitar recording more practical using a mobile device.
+
+The goal is to allow a workflow like this:
+
+```text
+┌──────────────────┐
+│ Wireless Camera  │
+│   YI / Future    │
+└────────┬─────────┘
+         │ RTSP
+         ▼
+┌─────────────────────────────────┐
+│            ToneStage            │
+│                                 │
+│  Camera Preview                 │
+│  Guitar Recording               │
+│  Backing Track                  │
+│  Mixer                          │
+│  EQ / Frequency Cut             │
+│                                 │
+└───────────────┬─────────────────┘
+                │
+                ▼
+         Final Video Export
+```
+
+---
+
+## ⚠️ Important Notes
+
+ToneStage is currently under active development.
+
+Some features described in this README are planned and may not yet be available in the current build.
+
+The application prioritizes:
+
+1. Recording stability
+2. Audio quality
+3. Audio-video synchronization
+4. Reliable wireless camera streaming
+
+New features should not compromise existing recording functionality.
+
+---
+
+## 📄 License
+
+License will be determined in a future release.
+
+---
+
+**ToneStage**  
+*Record. Play. Perform.*
