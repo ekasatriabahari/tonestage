@@ -82,3 +82,11 @@ export function describeSimultaneousIo(args: {
     text: `Input aktif; output terarah ke ${routedName ?? 'perangkat lain'}${routedIsUsb ? '' : ' (bukan USB)'}.`,
   };
 }
+
+export function latencyBreakdown(totalMs: number | null, bufferMs: number): { bufferMs: number, restMs: number } | null {
+  if (totalMs === null || bufferMs < 0 || totalMs < 0) {
+    return null;
+  }
+  const restMs = Math.max(0, totalMs - bufferMs);
+  return { bufferMs, restMs };
+}

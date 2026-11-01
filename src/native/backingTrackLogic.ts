@@ -230,3 +230,37 @@ export function outputWarning(device: OutputDevice): string | null {
   return null;
 }
 
+export type BackingLog = {
+  logStartUs: number;
+  logEndUs: number;
+  runs: Array<{
+    startNanoUs: number;
+    startFileUs: number;
+    endNanoUs: number;
+  }>;
+};
+
+export function parseBackingLog(json: string): BackingLog {
+  const e = asRecord(json);
+  const r = Array.isArray(e.runs) ? e.runs : [];
+  const runs = [];
+  for (const item of r) {
+    if (typeof item === 'object' && item !== null) {
+      const run = item as Record<string, unknown>;
+      if (typeof run.startNanoUs === 'number' && typeof run.startFileUs === 'number' && typeof run.endNanoUs === 'number') {
+        if (run.endNanoUs > run.startNanoUs) {
+          runs.push({
+            startNanoUs: run.startNanoUs,
+            startFileUs: run.startFileUs,
+            endNanoUs: run.endNanoUs,
+          });
+        }
+      }
+    }
+  }
+  return {
+    logStartUs: num(e.logStartUs),
+    logEndUs: num(e.logEndUs),
+    runs,
+  };
+}
