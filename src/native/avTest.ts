@@ -28,6 +28,7 @@ function errorCode(error: unknown): string {
  */
 export async function beginAudioCapture(
   deviceId: number,
+  path: string,
 ): Promise<{ ok: true; info: AudioCaptureStart } | Failure> {
   if (NativeAudioInput == null) {
     return { ok: false, message: describeAvError('MODULE_UNAVAILABLE') };
@@ -39,7 +40,7 @@ export async function beginAudioCapture(
   for (const rate of [44100, 48000]) {
     try {
       const info = parseAudioCaptureStart(
-        await NativeAudioInput.startAudioCapture(deviceId, rate, 2),
+        await NativeAudioInput.startAudioCapture(deviceId, rate, 2, path),
       );
       if (info.ok) {
         return { ok: true, info };

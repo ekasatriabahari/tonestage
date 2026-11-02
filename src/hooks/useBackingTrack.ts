@@ -40,6 +40,7 @@ const SAVE_DELAY_MS = 600;
  */
 export function useBackingTrack(active: boolean) {
   const [loaded, setLoaded] = useState<LoadedTrack | null>(null);
+  const [loadedUri, setLoadedUri] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<{ uri: string; name: string } | null>(null);
   const [status, setStatus] = useState<BackingStatus | null>(null);
   const [devices, setDevices] = useState<OutputDevice[]>([]);
@@ -150,9 +151,11 @@ export function useBackingTrack(active: boolean) {
     const result = await loadBackingTrack(uri);
     if (result.ok) {
       setLoaded(result.track);
+      setLoadedUri(uri);
       setMessage(null);
     } else {
       setLoaded(null);
+      setLoadedUri(null);
       setMessage(result.message);
     }
   }, []);
@@ -229,6 +232,7 @@ export function useBackingTrack(active: boolean) {
 
   return {
     loaded,
+    loadedUri,
     lastFile,
     status,
     devices,

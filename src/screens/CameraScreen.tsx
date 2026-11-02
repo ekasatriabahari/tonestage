@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { RecordingPanel } from '../components/RecordingPanel';
 import { YiLivePreview } from '../components/YiLivePreview';
+import type { BackingTrack } from '../hooks/useBackingTrack';
 import { useCombinedRecording } from '../hooks/useCombinedRecording';
 import { useYiActivation, type YiState } from '../hooks/useYiActivation';
 import { isYiControlAvailable } from '../native/yiControl';
@@ -52,11 +53,11 @@ function describeState(state: YiState): StatusView {
  * Camera screen, step 3: sends the activation command, then shows the live preview.
  * "perintah aktivasi diterima" does NOT mean video is playing; only the preview box reports that.
  */
-export function CameraScreen() {
+export function CameraScreen({ backing }: { backing: BackingTrack }) {
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(DEFAULT_YI_RTSP_URL);
   const { state, activate, deactivate } = useYiActivation();
-  const rec = useCombinedRecording();
+  const rec = useCombinedRecording(backing);
   const { abort } = rec;
   const cameraActive = state.kind === 'active';
 
@@ -96,7 +97,7 @@ export function CameraScreen() {
         <>
           <YiLivePreview
             source={url.trim()}
-            recording={rec.videoRecording}
+            recordingPath={rec.videoRecordingPath}
             onVideoReady={rec.setVideoReady}
             onRecordingEvent={rec.onVideoEvent}
           />

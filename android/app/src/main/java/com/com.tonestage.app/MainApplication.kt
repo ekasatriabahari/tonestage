@@ -8,6 +8,7 @@ import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.tonestage.app.audio.AudioInputPackage
 import com.tonestage.app.backing.BackingTrackPackage
+import com.tonestage.app.session.SessionsPackage
 import com.tonestage.app.yi.YiControlPackage
 
 class MainApplication : Application(), ReactApplication {
@@ -22,6 +23,7 @@ class MainApplication : Application(), ReactApplication {
           add(YiControlPackage())
           add(AudioInputPackage())
           add(BackingTrackPackage())
+          add(SessionsPackage())
         },
     )
   }

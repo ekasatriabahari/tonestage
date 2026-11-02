@@ -5,19 +5,22 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { useBackingTrack } from './src/hooks/useBackingTrack';
+import { useSessions } from './src/hooks/useSessions';
 import { AudioScreen } from './src/screens/AudioScreen';
 import { BackingTrackScreen } from './src/screens/BackingTrackScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { MixerScreen } from './src/screens/MixerScreen';
+import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { colors } from './src/theme/colors';
 
-type Tab = 'camera' | 'audio' | 'backing' | 'mixer';
+type Tab = 'camera' | 'audio' | 'backing' | 'mixer' | 'projects';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'camera', label: 'Kamera' },
   { id: 'audio', label: 'Audio' },
   { id: 'backing', label: 'Backing' },
   { id: 'mixer', label: 'Mixer' },
+  { id: 'projects', label: 'Proyek' },
 ];
 
 function Shell() {
@@ -25,13 +28,14 @@ function Shell() {
   const [tab, setTab] = useState<Tab>('camera');
   // One backing-track state shared by the Backing and Mixer tabs.
   const backing = useBackingTrack(tab === 'backing' || tab === 'mixer');
+  const sessions = useSessions(tab === 'projects');
 
   // All screens stay mounted: leaving the camera tab must not close the camera connection,
   // and the backing track keeps playing while another tab is shown.
   return (
     <View style={styles.root}>
       <View style={[styles.pane, tab !== 'camera' && styles.hidden]}>
-        <CameraScreen />
+        <CameraScreen backing={backing} />
       </View>
       <View style={[styles.pane, tab !== 'audio' && styles.hidden]}>
         <AudioScreen active={tab === 'audio'} />
@@ -41,6 +45,9 @@ function Shell() {
       </View>
       <View style={[styles.pane, tab !== 'mixer' && styles.hidden]}>
         <MixerScreen bt={backing} active={tab === 'mixer'} />
+      </View>
+      <View style={[styles.pane, tab !== 'projects' && styles.hidden]}>
+        <ProjectsScreen sessions={sessions} />
       </View>
       <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }]}>
         {TABS.map(t => (

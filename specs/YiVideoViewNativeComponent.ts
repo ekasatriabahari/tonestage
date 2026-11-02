@@ -13,8 +13,8 @@ type PlayerStateEvent = {
 export interface NativeProps extends ViewProps {
   /** RTSP URL to play. Set to an empty string (or unmount) to stop. */
   source?: string;
-  /** true: save the incoming stream to an MP4; false: stop and report the result. */
-  recording?: boolean;
+  /** Saves the incoming stream to this MP4 (inside the sessions folder); an empty string stops and reports the result. */
+  recordingPath?: string;
   onPlayerState?: CodegenTypes.BubblingEventHandler<PlayerStateEvent> | null;
 }
 

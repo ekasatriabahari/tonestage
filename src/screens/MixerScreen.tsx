@@ -10,7 +10,7 @@ import { useAudioMeter } from '../hooks/useAudioMeter';
 import type { BackingTrack } from '../hooks/useBackingTrack';
 import { describeDeviceType } from '../native/audioDevices';
 import { describeOutputType, formatClock } from '../native/backingTrackLogic';
-import { describeSimultaneousIo, monitoringNotes } from '../native/mixerLogic';
+import { describeSimultaneousIo, latencyBreakdown, monitoringNotes } from '../native/mixerLogic';
 import { colors } from '../theme/colors';
 
 type Props = { bt: BackingTrack; active: boolean };
@@ -83,6 +83,7 @@ export function MixerScreen({ bt, active }: Props) {
     routedName,
     routedIsUsb,
   });
+  const split = latencyBreakdown(bt.avgLatency, status === null ? -1 : status.bufferMs);
   const notes = monitoringNotes(bt.avgLatency, routed === undefined ? null : routed.type, routedIsUsb);
 
   return (
@@ -166,6 +167,14 @@ export function MixerScreen({ bt, active }: Props) {
 
         <Text style={styles.subtitle}>Input dan output bersamaan</Text>
         <Text style={[styles.detail, io.level === 'ok' && styles.ok]}>{io.text}</Text>
+
+        <Text style={styles.subtitle}>Jeda keluaran (perkiraan)</Text>
+        <Text style={styles.detail}>
+          {split === null
+            ? 'Terukur saat memutar.'
+            : `Buffer pemutar sekitar ${Math.round(split.bufferMs)} ms; sisanya (sistem Android, USB, perangkat) sekitar ${Math.round(split.restMs)} ms.`}
+          {status !== null && status.underruns >= 0 ? ` Buffer kehabisan data: ${status.underruns} kali.` : ''}
+        </Text>
 
         <Text style={styles.subtitle}>Catatan pemantauan</Text>
         {notes.map(note => (

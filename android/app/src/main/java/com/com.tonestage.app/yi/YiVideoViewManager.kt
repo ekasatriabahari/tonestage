@@ -25,9 +25,9 @@ class YiVideoViewManager :
     view.setSource(value)
   }
 
-  @ReactProp(name = "recording")
-  override fun setRecording(view: YiVideoView, value: Boolean) {
-    view.setRecording(value)
+  @ReactProp(name = "recordingPath")
+  override fun setRecordingPath(view: YiVideoView, value: String?) {
+    view.setRecordingPath(value)
   }
 
   override fun onDropViewInstance(view: YiVideoView) {

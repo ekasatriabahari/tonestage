@@ -56,6 +56,21 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const busy = sessions.exportingId !== null;
 
+  // First tap asks "sure?", second tap deletes.
+  const tapDelete = (kind: 'raw' | 'all', id: string) => {
+    const key = `${kind}:${id}`;
+    if (confirm === key) {
+      setConfirm(null);
+      if (kind === 'raw') {
+        sessions.deleteRaw(id);
+      } else {
+        sessions.deleteSession(id);
+      }
+    } else {
+      setConfirm(key);
+    }
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
       <BrandHeader />
@@ -164,7 +179,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
             <View style={styles.dangerRow}>
               {!session.rawDeleted && session.manifest !== null ? (
                 <Pressable
-                  onPress={() => (confirm === `raw:${session.id}` ? (setConfirm(null), sessions.deleteRaw(session.id)) : setConfirm(`raw:${session.id}`))}
+                  onPress={() => tapDelete('raw', session.id)}
                   disabled={busy}
                   accessibilityRole="button"
                   style={[styles.danger, busy && styles.disabled]}>
@@ -172,7 +187,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => (confirm === `all:${session.id}` ? (setConfirm(null), sessions.deleteSession(session.id)) : setConfirm(`all:${session.id}`))}
+                onPress={() => tapDelete('all', session.id)}
                 disabled={busy}
                 accessibilityRole="button"
                 style={[styles.danger, busy && styles.disabled]}>

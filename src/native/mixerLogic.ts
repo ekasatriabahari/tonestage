@@ -83,10 +83,13 @@ export function describeSimultaneousIo(args: {
   };
 }
 
-export function latencyBreakdown(totalMs: number | null, bufferMs: number): { bufferMs: number, restMs: number } | null {
-  if (totalMs === null || bufferMs < 0 || totalMs < 0) {
+/** Splits the estimated output delay into the player's own buffer and the rest (system, USB, device). */
+export function latencyBreakdown(
+  averageMs: number | null,
+  bufferMs: number,
+): { bufferMs: number; restMs: number } | null {
+  if (averageMs === null || !(bufferMs >= 0)) {
     return null;
   }
-  const restMs = Math.max(0, totalMs - bufferMs);
-  return { bufferMs, restMs };
+  return { bufferMs, restMs: Math.max(0, averageMs - bufferMs) };
 }

@@ -50,13 +50,14 @@ export interface Spec extends TurboModule {
   stopMeter(): Promise<void>;
 
   /**
-   * Starts recording the device to a WAV file in the app cache folder. Resolves with JSON
+   * Starts recording the device to the WAV file at `path` (inside the sessions folder). Resolves with JSON
    * {ok, error, source, sampleRate, channels}.
    */
   startAudioCapture(
     deviceId: number,
     sampleRate: number,
     channelCount: number,
+    path: string,
   ): Promise<string>;
 
   /**

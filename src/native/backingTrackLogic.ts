@@ -35,6 +35,9 @@ export type BackingStatus = {
   requestedDeviceId: number;
   /** Estimated delay from writing a frame to hearing it (ms); -1 when unknown. */
   outputLatencyMs: number;
+  /** Size of the player's own output buffer (ms) and how many times it ran dry; -1 when unknown. */
+  bufferMs: number;
+  underruns: number;
 };
 
 export type OutputDevice = {
@@ -98,6 +101,8 @@ export function parseBackingStatus(json: string): BackingStatus {
     routedDeviceName: str(e.routedDeviceName),
     requestedDeviceId: typeof e.requestedDeviceId === 'number' ? e.requestedDeviceId : -1,
     outputLatencyMs: typeof e.outputLatencyMs === 'number' ? e.outputLatencyMs : -1,
+    bufferMs: typeof e.bufferMs === 'number' ? e.bufferMs : -1,
+    underruns: typeof e.underruns === 'number' ? e.underruns : -1,
   };
 }
 
@@ -230,37 +235,27 @@ export function outputWarning(device: OutputDevice): string | null {
   return null;
 }
 
-export type BackingLog = {
-  logStartUs: number;
-  logEndUs: number;
-  runs: Array<{
-    startNanoUs: number;
-    startFileUs: number;
-    endNanoUs: number;
-  }>;
-};
+/** One stretch of continuous playback: file position at time t is startFileUs + (t - startNanoUs). */
+export type BackingRunLog = { startNanoUs: number; startFileUs: number; endNanoUs: number };
 
+export type BackingLog = { logStartUs: number; logEndUs: number; runs: BackingRunLog[] };
+
+/** Throws on invalid JSON. Runs that are not finished or not forward in time are dropped. */
 export function parseBackingLog(json: string): BackingLog {
   const e = asRecord(json);
-  const r = Array.isArray(e.runs) ? e.runs : [];
-  const runs = [];
-  for (const item of r) {
-    if (typeof item === 'object' && item !== null) {
-      const run = item as Record<string, unknown>;
-      if (typeof run.startNanoUs === 'number' && typeof run.startFileUs === 'number' && typeof run.endNanoUs === 'number') {
-        if (run.endNanoUs > run.startNanoUs) {
-          runs.push({
-            startNanoUs: run.startNanoUs,
-            startFileUs: run.startFileUs,
-            endNanoUs: run.endNanoUs,
-          });
-        }
+  const runs: BackingRunLog[] = [];
+  if (Array.isArray(e.runs)) {
+    for (const item of e.runs) {
+      if (typeof item !== 'object' || item === null) {
+        continue;
+      }
+      const r = item as Record<string, unknown>;
+      const start = num(r.startNanoUs);
+      const end = typeof r.endNanoUs === 'number' ? r.endNanoUs : -1;
+      if (end > start) {
+        runs.push({ startNanoUs: start, startFileUs: typeof r.startFileUs === 'number' ? r.startFileUs : 0, endNanoUs: end });
       }
     }
   }
-  return {
-    logStartUs: num(e.logStartUs),
-    logEndUs: num(e.logEndUs),
-    runs,
-  };
+  return { logStartUs: num(e.logStartUs), logEndUs: num(e.logEndUs), runs };
 }

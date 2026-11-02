@@ -4,6 +4,8 @@ import {
   describeBackingError,
   type LoadedTrack,
   type OutputDevice,
+  type BackingLog,
+  parseBackingLog,
   parseBackingStatus,
   parseLoadedTrack,
   parseOutputDevices,
@@ -124,6 +126,20 @@ export async function listBackingOutputs(): Promise<OutputDevice[] | null> {
   }
   try {
     return parseOutputDevices(await NativeBackingTrack.getOutputDevices());
+  } catch {
+    return null;
+  }
+}
+
+export const startBackingLog = () => call(m => m.startEventLog());
+
+/** The playback runs logged since startBackingLog; null when they cannot be read. */
+export async function stopBackingLog(): Promise<BackingLog | null> {
+  if (NativeBackingTrack == null) {
+    return null;
+  }
+  try {
+    return parseBackingLog(await NativeBackingTrack.stopEventLog());
   } catch {
     return null;
   }

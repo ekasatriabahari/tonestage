@@ -121,19 +121,30 @@ class YiVideoView(context: Context) : PlayerView(context) {
   }
 
   /**
-   * Starts or stops writing the incoming H.264 stream to an MP4 in the app cache folder. Stopping
-   * reports the measured result with a "recorded" event.
+   * Starts writing the incoming H.264 stream to the MP4 at [path] (it must be inside the app's
+   * sessions folder), or stops when [path] is null or empty. Stopping reports the measured result
+   * with a "recorded" event.
    */
-  fun setRecording(on: Boolean) {
-    if (on) {
-      if (player == null) {
-        return
-      }
-      recorder.onStarted = { post { emit("recording", 0, 0, "") } }
-      recorder.start(File(context.cacheDir, "video_${System.currentTimeMillis()}.mp4"))
-    } else {
+  fun setRecordingPath(path: String?) {
+    if (path.isNullOrEmpty()) {
       finishRecording()
+      return
     }
+    if (player == null) {
+      return
+    }
+    val allowed =
+        try {
+          File(path).canonicalPath.startsWith(File(context.filesDir, "sessions").canonicalPath + File.separator)
+        } catch (e: Exception) {
+          false
+        }
+    if (!allowed) {
+      emit("recorded", 0, 0, "{\"ok\":false,\"error\":\"BAD_PATH\"}")
+      return
+    }
+    recorder.onStarted = { post { emit("recording", 0, 0, "") } }
+    recorder.start(File(path))
   }
 
   private fun finishRecording() {

@@ -199,6 +199,7 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
       deviceId: Double,
       sampleRate: Double,
       channelCount: Double,
+      path: String,
       promise: Promise,
   ) {
     executor.execute {
@@ -212,8 +213,14 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
           promise.reject("DEVICE_NOT_FOUND", "Input device ${deviceId.toInt()} is not connected")
           return@execute
         }
+        val sessions = File(getReactApplicationContext().filesDir, "sessions").canonicalPath
+        val file = File(path)
+        // Recordings are only written inside the app's sessions folder.
+        if (!file.canonicalPath.startsWith(sessions + File.separator)) {
+          promise.reject("BAD_PATH", "Recording path is not allowed")
+          return@execute
+        }
         meter.stop()
-        val file = File(getReactApplicationContext().cacheDir, "audio_${System.currentTimeMillis()}.wav")
         promise.resolve(
             fileRecorder.start(device, file, sampleRate.toInt(), channelCount.toInt()).toString()
         )
