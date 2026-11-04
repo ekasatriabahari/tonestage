@@ -1,18 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listAudioInputs } from '../native/audioInput';
-import { type AudioCaptureResult, type AudioChoice, pickAudioInput } from '../native/avRecording';
+import {
+  type AudioCaptureResult,
+  type AudioChoice,
+  pickAudioInput,
+} from '../native/avRecording';
 import { beginAudioCapture, endAudioCapture } from '../native/avTest';
 import { type BackingLog } from '../native/backingTrackLogic';
 import { startBackingLog, stopBackingLog } from '../native/backingTrack';
-import { buildManifest, MIN_FREE_BYTES_TO_RECORD, type StorageInfo } from '../native/session';
-import { createSessionFolder, readStorage, saveSessionManifest } from '../native/sessions';
+import {
+  buildManifest,
+  MIN_FREE_BYTES_TO_RECORD,
+  type StorageInfo,
+} from '../native/session';
+import {
+  createSessionFolder,
+  readStorage,
+  saveSessionManifest,
+} from '../native/sessions';
 import type { MixerSettings } from '../native/mixerSettings';
 import type { RecordingEvent, RecordingStats } from '../native/yiVideo';
 import type { BackingTrack } from './useBackingTrack';
 
-export type RecPhase = 'idle' | 'starting' | 'recording' | 'stopping' | 'finished' | 'error';
+export type RecPhase =
+  | 'idle'
+  | 'starting'
+  | 'recording'
+  | 'stopping'
+  | 'finished'
+  | 'error';
 
-type SessionRef = { id: string; createdMs: number; videoPath: string; audioPath: string };
+type SessionRef = {
+  id: string;
+  createdMs: number;
+  videoPath: string;
+  audioPath: string;
+};
 
 /**
  * One recording = one session folder holding the raw video, the clean guitar WAV and a manifest.
@@ -29,7 +52,9 @@ export function useCombinedRecording(backing: BackingTrack) {
   const [since, setSince] = useState(0);
   const [videoStats, setVideoStats] = useState<RecordingStats | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
-  const [audioResult, setAudioResult] = useState<AudioCaptureResult | null>(null);
+  const [audioResult, setAudioResult] = useState<AudioCaptureResult | null>(
+    null,
+  );
   const [audioError, setAudioError] = useState<string | null>(null);
   const [backingLog, setBackingLog] = useState<BackingLog | null>(null);
   const [logDone, setLogDone] = useState(false);
@@ -95,7 +120,9 @@ export function useCombinedRecording(backing: BackingTrack) {
 
     const space = await readStorage();
     if (space !== null && space.availableBytes < MIN_FREE_BYTES_TO_RECORD) {
-      await fail('Ruang penyimpanan hampir habis. Hapus sesi lama di tab Proyek, lalu coba lagi.');
+      await fail(
+        'Ruang penyimpanan hampir habis. Hapus sesi lama di tab Proyek, lalu coba lagi.',
+      );
       return;
     }
     const listing = await listAudioInputs();
@@ -123,6 +150,12 @@ export function useCombinedRecording(backing: BackingTrack) {
       guitarVolume: b.guitarVolume,
       guitarMuted: b.guitarMuted,
       eq: b.eq,
+      // chatgpt suggestion
+      exportDefaults: {
+        videoLatencyMs: 0,
+        backingOffsetMs: 0,
+      },
+      // ---------------
     };
     await startBackingLog();
     logActive.current = true;
@@ -183,7 +216,14 @@ export function useCombinedRecording(backing: BackingTrack) {
       video: videoStats,
       audio: audioResult,
       audioDevice: audioChoice,
-      backing: backingLog !== null && b.loadedUri !== null ? { uri: b.loadedUri, name: b.loaded === null ? '' : b.loaded.name, log: backingLog } : null,
+      backing:
+        backingLog !== null && b.loadedUri !== null
+          ? {
+              uri: b.loadedUri,
+              name: b.loaded === null ? '' : b.loaded.name,
+              log: backingLog,
+            }
+          : null,
       mixer: mixer.current,
     });
     saveSessionManifest(current.id, JSON.stringify(manifest)).then(ok => {
@@ -191,16 +231,31 @@ export function useCombinedRecording(backing: BackingTrack) {
         setSavedId(current.id);
         setPhase('finished');
       } else {
-        setMessage('Manifest sesi tidak dapat disimpan. File mentah masih ada di tab Proyek.');
+        setMessage(
+          'Manifest sesi tidak dapat disimpan. File mentah masih ada di tab Proyek.',
+        );
         setPhase('error');
       }
     });
-  }, [phase, videoStats, videoFailed, audioResult, audioError, logDone, audioChoice, backingLog]);
+  }, [
+    phase,
+    videoStats,
+    videoFailed,
+    audioResult,
+    audioError,
+    logDone,
+    audioChoice,
+    backingLog,
+  ]);
 
   /** Stops everything, for example when the camera connection is lost. Files already written stay. */
   const abort = useCallback(
     async (reason: string) => {
-      if (phase !== 'starting' && phase !== 'recording' && phase !== 'stopping') {
+      if (
+        phase !== 'starting' &&
+        phase !== 'recording' &&
+        phase !== 'stopping'
+      ) {
         return;
       }
       setVideoRecordingPath('');
