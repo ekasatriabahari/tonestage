@@ -236,7 +236,15 @@ export function outputWarning(device: OutputDevice): string | null {
 }
 
 /** One stretch of continuous playback: file position at time t is startFileUs + (t - startNanoUs). */
-export type BackingRunLog = { startNanoUs: number; startFileUs: number; endNanoUs: number };
+export type BackingRunLog = {
+  startNanoUs: number;
+  startFileUs: number;
+  endNanoUs: number;
+  /** How far the output clock runs from system time (parts per million); 0 when the run was too short to measure. */
+  slopePpm?: number;
+  /** Time between the first and last timestamp used to measure slopePpm. */
+  anchorSpanMs?: number;
+};
 
 export type BackingLog = { logStartUs: number; logEndUs: number; runs: BackingRunLog[] };
 
@@ -253,7 +261,13 @@ export function parseBackingLog(json: string): BackingLog {
       const start = num(r.startNanoUs);
       const end = typeof r.endNanoUs === 'number' ? r.endNanoUs : -1;
       if (end > start) {
-        runs.push({ startNanoUs: start, startFileUs: typeof r.startFileUs === 'number' ? r.startFileUs : 0, endNanoUs: end });
+        runs.push({
+          startNanoUs: start,
+          startFileUs: typeof r.startFileUs === 'number' ? r.startFileUs : 0,
+          endNanoUs: end,
+          slopePpm: typeof r.slopePpm === 'number' ? r.slopePpm : 0,
+          anchorSpanMs: typeof r.anchorSpanMs === 'number' ? r.anchorSpanMs : 0,
+        });
       }
     }
   }

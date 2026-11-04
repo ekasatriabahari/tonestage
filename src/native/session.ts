@@ -203,10 +203,57 @@ export function summarizeSession(s: SessionInfo): string[] {
     } else {
       const runs = Array.isArray(backing.runs) ? backing.runs.length : 0;
       lines.push(`Backing track: ${String(backing.name ?? '')} (${runs} bagian diputar)`);
+      const clock = backingClockLine(backing.runs);
+      if (clock !== null) {
+        lines.push(clock);
+      }
+    }
+    if (guitar !== null) {
+      const clock = guitarClockLine(guitar);
+      if (clock !== null) {
+        lines.push(clock);
+      }
     }
   }
   lines.push(`File: video ${formatBytes(s.videoBytes)}, gitar ${formatBytes(s.guitarBytes)}${s.rawDeleted ? ' (file mentah sudah dihapus)' : ''}`);
   return lines;
+}
+
+/** Drift in milliseconds per minute for a clock that is off by [ppm] parts per million. */
+const msPerMinute = (ppm: number): number => (ppm * 60_000) / 1e6;
+
+const signed = (v: number, digits: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(digits)}`;
+
+/** The speed of the guitar input clock, when it was measured over a long enough recording. */
+function guitarClockLine(guitar: Record<string, unknown>): string | null {
+  const rate = num(guitar.sampleRate);
+  const measured = num(guitar.measuredRateHz);
+  if (!(rate > 0) || !(measured > 0)) {
+    return null;
+  }
+  const ppm = (measured / rate - 1) * 1e6;
+  return `Jam gitar: ${signed(ppm, 0)} ppm (sekitar ${signed(msPerMinute(ppm), 1)} ms per menit)`;
+}
+
+/** The speed of the backing track output clock, from the longest measured run (at least 5 s). */
+function backingClockLine(runs: unknown): string | null {
+  if (!Array.isArray(runs)) {
+    return null;
+  }
+  let best: Record<string, unknown> | null = null;
+  for (const r of runs) {
+    if (typeof r === 'object' && r !== null) {
+      const run = r as Record<string, unknown>;
+      if (num(run.anchorSpanMs) >= 5000 && (best === null || num(run.anchorSpanMs) > num(best.anchorSpanMs))) {
+        best = run;
+      }
+    }
+  }
+  if (best === null) {
+    return null;
+  }
+  const ppm = num(best.slopePpm);
+  return `Jam backing track: ${signed(ppm, 0)} ppm (sekitar ${signed(msPerMinute(ppm), 1)} ms per menit; diukur ${(num(best.anchorSpanMs) / 1000).toFixed(0)} dtk)`;
 }
 
 export type ExportOptions = { videoLatencyMs: number; backingOffsetMs: number; includeBacking: boolean };

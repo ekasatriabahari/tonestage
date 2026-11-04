@@ -28,7 +28,7 @@ function Shell() {
   const [tab, setTab] = useState<Tab>('camera');
   // One backing-track state shared by the Backing and Mixer tabs.
   const backing = useBackingTrack(tab === 'backing' || tab === 'mixer');
-  const sessions = useSessions(tab === 'projects');
+  const sessions = useSessions(tab === 'projects', backing.exportDefaults);
 
   // All screens stay mounted: leaving the camera tab must not close the camera connection,
   // and the backing track keeps playing while another tab is shown.
@@ -47,7 +47,7 @@ function Shell() {
         <MixerScreen bt={backing} active={tab === 'mixer'} />
       </View>
       <View style={[styles.pane, tab !== 'projects' && styles.hidden]}>
-        <ProjectsScreen sessions={sessions} />
+        <ProjectsScreen sessions={sessions} defaults={backing.exportDefaults} onSaveDefaults={backing.setExportDefaults} />
       </View>
       <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }]}>
         {TABS.map(t => (

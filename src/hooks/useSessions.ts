@@ -20,7 +20,7 @@ import {
 } from '../native/sessions';
 
 /** The recorded sessions and their exports. Raw files stay until you delete them. */
-export function useSessions(active: boolean) {
+export function useSessions(active: boolean, defaults: { videoLatencyMs: number; backingOffsetMs: number }) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [options, setOptions] = useState<Record<string, ExportOptions>>({});
@@ -59,19 +59,19 @@ export function useSessions(active: boolean) {
   }, [exportingId]);
 
   const optionsFor = useCallback(
-    (id: string): ExportOptions => options[id] ?? DEFAULT_EXPORT_OPTIONS,
-    [options],
+    (id: string): ExportOptions => options[id] ?? { ...DEFAULT_EXPORT_OPTIONS, ...defaults },
+    [options, defaults],
   );
 
   const setOption = useCallback((id: string, patch: Partial<ExportOptions>) => {
     setOptions(prev => {
-      const next = { ...(prev[id] ?? DEFAULT_EXPORT_OPTIONS), ...patch };
+      const next = { ...(prev[id] ?? { ...DEFAULT_EXPORT_OPTIONS, ...defaults }), ...patch };
       return {
         ...prev,
         [id]: { ...next, videoLatencyMs: clampOffsetMs(next.videoLatencyMs), backingOffsetMs: clampOffsetMs(next.backingOffsetMs) },
       };
     });
-  }, []);
+  }, [defaults]);
 
   const exportOne = useCallback(
     async (id: string) => {

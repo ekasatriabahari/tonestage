@@ -47,7 +47,16 @@ internal class BackingTrackEngine(private val context: Context) {
   @Volatile private var liveFramesWritten = 0L
 
   // Log of the stretches that were really playing (used to rebuild the backing track on export).
-  private class RunRecord(val startNanoUs: Long, val startFileUs: Long, var endNanoUs: Long)
+  private class RunRecord(
+      val startNanoUs: Long,
+      val startFileUs: Long,
+      var endNanoUs: Long,
+      val anchorNanoUs0: Long,
+      val anchorFileUs0: Long,
+  ) {
+    var lastAnchorNanoUs = anchorNanoUs0
+    var lastAnchorFileUs = anchorFileUs0
+  }
 
   private val logLock = Any()
   @Volatile private var logging = false
@@ -239,11 +248,17 @@ internal class BackingTrackEngine(private val context: Context) {
       json.put("logStartUs", logStartUs)
       json.put("logEndUs", now)
       for (run in finishedRuns) {
+        // How much file time passes per second of system time (parts per million away from 1.0).
+        val span = run.lastAnchorNanoUs - run.anchorNanoUs0
+        val slopePpm =
+            if (span >= 2_000_000L) ((run.lastAnchorFileUs - run.anchorFileUs0).toDouble() / span - 1.0) * 1e6 else 0.0
         runs.put(
             JSONObject()
                 .put("startNanoUs", run.startNanoUs)
                 .put("startFileUs", run.startFileUs)
                 .put("endNanoUs", run.endNanoUs)
+                .put("slopePpm", slopePpm)
+                .put("anchorSpanMs", span / 1000)
         )
       }
     }
@@ -277,8 +292,19 @@ internal class BackingTrackEngine(private val context: Context) {
       // If the track was already playing when logging began, the run reaches back to that moment.
       val extend = playingAtLogStart && finishedRuns.isEmpty() && anchorNanoUs > logStartUs
       val start = if (extend) logStartUs else anchorNanoUs
-      currentRun = RunRecord(start, anchorFileUs - (anchorNanoUs - start), -1)
+      currentRun = RunRecord(start, anchorFileUs - (anchorNanoUs - start), -1, anchorNanoUs, anchorFileUs)
       runOpen = true
+    }
+  }
+
+  /** A later timestamp inside the open run; used to measure the speed of the output clock. */
+  private fun updateRunAnchor(anchorNanoUs: Long, anchorFileUs: Long) {
+    synchronized(logLock) {
+      val run = currentRun
+      if (run != null && anchorNanoUs > run.lastAnchorNanoUs) {
+        run.lastAnchorNanoUs = anchorNanoUs
+        run.lastAnchorFileUs = anchorFileUs
+      }
     }
   }
 
@@ -455,6 +481,7 @@ internal class BackingTrackEngine(private val context: Context) {
     private var framesWritten = 0L
     private var eq: BiquadEq? = null
     private val logTimestamp = AudioTimestamp()
+    private var lastRefreshUs = 0L
     private var eqApplied = -1
     private val info = MediaCodec.BufferInfo()
     private val rawBuffer = ByteBuffer.allocate(32 * 1024)
@@ -556,11 +583,19 @@ internal class BackingTrackEngine(private val context: Context) {
 
     /** While logging and no run is open: use a fresh timestamp to open one. */
     fun logAnchor() {
-      if (runOpen) {
-        return
-      }
       val current = track ?: return
       if (!trackPlaying || rate <= 0) {
+        return
+      }
+      if (runOpen) {
+        val now = System.nanoTime() / 1000
+        if (now - lastRefreshUs >= 500_000L && current.getTimestamp(logTimestamp)) {
+          lastRefreshUs = now
+          updateRunAnchor(
+              logTimestamp.nanoTime / 1000,
+              (baseFrame + logTimestamp.framePosition) * 1_000_000L / rate,
+          )
+        }
         return
       }
       if (current.getTimestamp(logTimestamp)) {

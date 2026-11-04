@@ -15,7 +15,7 @@ import {
 import { isSessionsAvailable } from '../native/sessions';
 import { colors } from '../theme/colors';
 
-const STEPS = [-100, -10, 10, 100];
+const STEPS = [-100, -10, -5, -1, 1, 5, 10, 100];
 
 function Offset({
   label,
@@ -51,7 +51,15 @@ function Offset({
 }
 
 /** Recorded sessions: export to MP4 (again, with other offsets, as often as needed) and clean up. */
-export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
+export function ProjectsScreen({
+  sessions,
+  defaults,
+  onSaveDefaults,
+}: {
+  sessions: SessionsState;
+  defaults: { videoLatencyMs: number; backingOffsetMs: number };
+  onSaveDefaults: (videoLatencyMs: number, backingOffsetMs: number) => void;
+}) {
   const insets = useSafeAreaInsets();
   const [confirm, setConfirm] = useState<string | null>(null);
   const busy = sessions.exportingId !== null;
@@ -107,7 +115,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
               <>
                 <Offset
                   label="Penundaan video"
-                  help="Seberapa lambat gambar dibanding suaranya. Jika di hasil suara tepukan terdengar LEBIH DULU daripada gerak tangan, naikkan; jika terdengar lebih lambat, turunkan."
+                  help="Untuk GAMBAR vs SUARA (semua audio sekaligus). Jika suara tepukan terdengar LEBIH DULU daripada gerak tangan, naikkan; jika lebih lambat, turunkan. Ini tidak mengubah selisih gitar vs backing track."
                   value={options.videoLatencyMs}
                   onChange={ms => sessions.setOption(session.id, { videoLatencyMs: ms })}
                   disabled={busy}
@@ -116,7 +124,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
                   <>
                     <Offset
                       label="Geser backing track"
-                      help="Menggeser backing track terhadap gitar dan video (mis. jeda perangkat keluaran). Mulai dari 0; ubah hanya jika hasil uji menunjukkan selisih tetap."
+                      help="Untuk GITAR vs BACKING TRACK. Jika backing track terdengar lebih awal dari gitar, naikkan (backing digeser lebih lambat); jika lebih lambat, turunkan. Jeda SPM (USB masuk dan keluar) biasanya tetap, jadi cukup dicari sekali."
                       value={options.backingOffsetMs}
                       onChange={ms => sessions.setOption(session.id, { backingOffsetMs: ms })}
                       disabled={busy}
@@ -133,7 +141,16 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
                     </Pressable>
                   </>
                 ) : null}
-                <Text style={styles.note}>Rentang geser {OFFSET_MIN_MS} sampai {OFFSET_MAX_MS} ms.</Text>
+                <Text style={styles.note}>
+                  Rentang geser {OFFSET_MIN_MS} sampai {OFFSET_MAX_MS} ms. Bawaan tersimpan: video {defaults.videoLatencyMs} ms, backing {defaults.backingOffsetMs} ms.
+                </Text>
+                <Pressable
+                  onPress={() => onSaveDefaults(options.videoLatencyMs, options.backingOffsetMs)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  style={[styles.secondary, busy && styles.disabled]}>
+                  <Text style={styles.secondaryText}>Simpan angka ini sebagai bawaan</Text>
+                </Pressable>
                 <Pressable onPress={() => sessions.exportOne(session.id)} disabled={!canExport} accessibilityRole="button" style={[styles.primary, !canExport && styles.disabled]}>
                   <Text style={styles.primaryText}>{thisExport ? 'Mengekspor...' : session.exports.length > 0 ? 'Ekspor ulang MP4' : 'Ekspor MP4'}</Text>
                 </Pressable>
@@ -213,7 +230,7 @@ const styles = StyleSheet.create({
   ok: { color: colors.success, fontSize: 12, lineHeight: 17 },
   disabled: { opacity: 0.4 },
   offset: { gap: 6 },
-  stepRow: { flexDirection: 'row', gap: 8 },
+  stepRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   stepButton: { borderColor: colors.accent, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   stepText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   chip: { alignSelf: 'flex-start', borderColor: colors.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
