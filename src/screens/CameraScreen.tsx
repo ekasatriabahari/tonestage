@@ -112,6 +112,22 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
           </Text>
         </View>
       )}
+      <Pressable
+        onPress={onPressMain}
+        disabled={!canPress}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canPress }}
+        style={[styles.primaryButton, !canPress && styles.primaryButtonDisabled]}>
+        <Text style={[styles.primaryButtonText, !canPress && styles.primaryButtonTextDisabled]}>
+          {buttonLabel}
+        </Text>
+      </Pressable>
+      <Text style={styles.helpText}>
+        {moduleAvailable
+          ? 'Sambungkan ponsel ke Wi-Fi kamera Yi (namanya mirip YDXJ_...), lalu tekan Hubungkan. Koneksi kontrol harus tetap terbuka agar video terus tampil.'
+          : 'Modul kontrol kamera tidak tersedia di build ini.'}
+      </Text>
+
       <RecordingPanel rec={rec} />
       <MiniStudioPanel backing={backing} active={screenActive} />
 
@@ -159,21 +175,6 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
         </Pressable>
       </View>
 
-      <Pressable
-        onPress={onPressMain}
-        disabled={!canPress}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !canPress }}
-        style={[styles.primaryButton, !canPress && styles.primaryButtonDisabled]}>
-        <Text style={[styles.primaryButtonText, !canPress && styles.primaryButtonTextDisabled]}>
-          {buttonLabel}
-        </Text>
-      </Pressable>
-      <Text style={styles.helpText}>
-        {moduleAvailable
-          ? 'Sambungkan ponsel ke Wi-Fi kamera Yi (namanya mirip YDXJ_...), lalu tekan Hubungkan. Koneksi kontrol harus tetap terbuka agar video terus tampil.'
-          : 'Modul kontrol kamera tidak tersedia di build ini.'}
-      </Text>
     </ScrollView>
   );
 }
