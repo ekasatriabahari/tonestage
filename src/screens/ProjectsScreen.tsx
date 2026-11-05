@@ -62,6 +62,7 @@ export function ProjectsScreen({
 }) {
   const insets = useSafeAreaInsets();
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const busy = sessions.exportingId !== null;
 
   // First tap asks "sure?", second tap deletes.
@@ -82,6 +83,14 @@ export function ProjectsScreen({
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
       <BrandHeader />
+      <Text style={styles.libraryTitle}>{selectedId === null ? 'Project Library' : 'Project Detail'}</Text>
+      {selectedId !== null ? (
+        <Pressable onPress={() => setSelectedId(null)} accessibilityRole="button" style={styles.secondary}>
+          <Text style={styles.secondaryText}>Kembali ke Library</Text>
+        </Pressable>
+      ) : (
+        <Text style={styles.note}>{sessions.sessions.length} project tersimpan di perangkat ini.</Text>
+      )}
       {!isSessionsAvailable() ? <Text style={styles.error}>Modul sesi tidak tersedia di build ini.</Text> : null}
       {sessions.storage !== null ? (
         <Text style={styles.note}>
@@ -94,7 +103,7 @@ export function ProjectsScreen({
       </Pressable>
       {sessions.sessions.length === 0 ? <Text style={styles.note}>Belum ada sesi. Rekam di tab Kamera.</Text> : null}
 
-      {sessions.sessions.map(session => {
+      {sessions.sessions.filter(session => selectedId === null || session.id === selectedId).map(session => {
         const options = sessions.optionsFor(session.id);
         const thisExport = sessions.exportingId === session.id;
         const result = sessions.results[session.id];
@@ -104,7 +113,7 @@ export function ProjectsScreen({
         const hasBacking = session.manifest !== null && typeof session.manifest.backing === 'object' && session.manifest.backing !== null;
         return (
           <View key={session.id} style={styles.card}>
-            <View style={styles.projectHeader}>
+            <Pressable onPress={() => setSelectedId(session.id)} accessibilityRole="button" style={styles.projectHeader}>
               {session.thumbnailPath !== '' ? (
                 <Image source={{ uri: `file://${session.thumbnailPath}` }} style={styles.thumbnail} />
               ) : (
@@ -119,7 +128,8 @@ export function ProjectsScreen({
                   {session.status === 'complete' ? 'Project siap' : session.status === 'interrupted' ? 'Rekaman terputus — raw dipertahankan' : session.status === 'recording' ? 'Sedang merekam' : 'Perlu pemulihan'}
                 </Text>
               </View>
-            </View>
+              <Text style={styles.openProject}>›</Text>
+            </Pressable>
             {summarizeSession(session).map(line => (
               <Text key={line} style={styles.detail}>
                 {line}
@@ -235,6 +245,7 @@ export function ProjectsScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  libraryTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 },
   projectHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -242,6 +253,7 @@ const styles = StyleSheet.create({
   thumbnailEmpty: { alignItems: 'center', justifyContent: 'center' },
   thumbnailEmptyText: { color: colors.accent, fontSize: 24, fontWeight: '800' },
   projectHeading: { flex: 1, gap: 4 },
+  openProject: { color: colors.accent, fontSize: 28, fontWeight: '600' },
   status: { fontSize: 11, fontWeight: '700' },
   statusComplete: { color: colors.success },
   statusWarning: { color: colors.record },
