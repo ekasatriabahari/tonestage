@@ -40,6 +40,28 @@ class SessionsModule(reactContext: ReactApplicationContext) : NativeSessionsSpec
     }
   }
 
+  override fun copyBackingTrack(id: String, uri: String, displayName: String, promise: Promise) {
+    executor.execute {
+      try {
+        val copied = store.copyBackingTrack(id, Uri.parse(uri), displayName)
+        if (copied == null) promise.reject("BACKING_COPY_FAILED", "Could not copy the backing track")
+        else promise.resolve(copied)
+      } catch (e: Exception) {
+        promise.reject("BACKING_COPY_FAILED", e.message ?: "Could not copy the backing track")
+      }
+    }
+  }
+
+  override fun generateThumbnail(id: String, promise: Promise) {
+    executor.execute {
+      try {
+        promise.resolve(store.createThumbnail(id) ?: "")
+      } catch (e: Exception) {
+        promise.resolve("")
+      }
+    }
+  }
+
   override fun saveManifest(id: String, json: String, promise: Promise) {
     executor.execute {
       try {
