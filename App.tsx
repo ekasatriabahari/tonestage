@@ -51,6 +51,9 @@ function Shell() {
       <View style={[styles.pane, tab !== 'projects' && styles.hidden]}>
         <ProjectsScreen sessions={sessions} defaults={backing.exportDefaults} onSaveDefaults={backing.setExportDefaults} />
       </View>
+      <View style={[styles.pane, tab !== 'sync' && styles.hidden]}>
+        <SyncSettingsScreen defaults={backing.exportDefaults} onSave={backing.setExportDefaults} />
+      </View>
       <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }]}>
         {TABS.map(t => (
           <Pressable
