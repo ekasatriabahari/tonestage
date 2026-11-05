@@ -103,7 +103,6 @@ export function CameraScreen({ backing }: { backing: BackingTrack }) {
             onRecordingEvent={rec.onVideoEvent}
           />
           <RecordingPanel rec={rec} />
-          <MiniStudioPanel backing={backing} active={cameraActive} />
         </>
       ) : (
         <View style={styles.preview}>
@@ -114,6 +113,8 @@ export function CameraScreen({ backing }: { backing: BackingTrack }) {
           </Text>
         </View>
       )}
+      <RecordingPanel rec={rec} />
+      <MiniStudioPanel backing={backing} active={cameraActive} />
 
       <View style={styles.statusBlock}>
         <View style={styles.statusRow}>
