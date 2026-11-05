@@ -102,7 +102,6 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
             onVideoReady={rec.setVideoReady}
             onRecordingEvent={rec.onVideoEvent}
           />
-          <RecordingPanel rec={rec} />
         </>
       ) : (
         <View style={styles.preview}>
