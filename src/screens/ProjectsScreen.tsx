@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import type { SessionsState } from '../hooks/useSessions';
@@ -100,18 +100,33 @@ export function ProjectsScreen({
         const result = sessions.results[session.id];
         const error = sessions.errors[session.id];
         const saved = sessions.saved[session.id];
-        const canExport = session.manifest !== null && !session.rawDeleted && !busy;
+        const canExport = session.status === 'complete' && session.manifest !== null && !session.rawDeleted && !busy;
         const hasBacking = session.manifest !== null && typeof session.manifest.backing === 'object' && session.manifest.backing !== null;
         return (
           <View key={session.id} style={styles.card}>
-            <Text style={styles.title}>{formatDateTime(session.createdMs)}</Text>
+            <View style={styles.projectHeader}>
+              {session.thumbnailPath !== '' ? (
+                <Image source={{ uri: `file://${session.thumbnailPath}` }} style={styles.thumbnail} />
+              ) : (
+                <View style={[styles.thumbnail, styles.thumbnailEmpty]}>
+                  <Text style={styles.thumbnailEmptyText}>TS</Text>
+                </View>
+              )}
+              <View style={styles.projectHeading}>
+                <Text style={styles.title}>Guitar Cover</Text>
+                <Text style={styles.detail}>{formatDateTime(session.createdMs)}</Text>
+                <Text style={[styles.status, session.status === 'complete' ? styles.statusComplete : styles.statusWarning]}>
+                  {session.status === 'complete' ? 'Project siap' : session.status === 'interrupted' ? 'Rekaman terputus — raw dipertahankan' : session.status === 'recording' ? 'Sedang merekam' : 'Perlu pemulihan'}
+                </Text>
+              </View>
+            </View>
             {summarizeSession(session).map(line => (
               <Text key={line} style={styles.detail}>
                 {line}
               </Text>
             ))}
 
-            {session.manifest !== null && !session.rawDeleted ? (
+            {session.status === 'complete' && session.manifest !== null && !session.rawDeleted ? (
               <>
                 <Offset
                   label="Penundaan video"
@@ -222,6 +237,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 },
+  projectHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  thumbnail: { width: 112, height: 72, borderRadius: 9, backgroundColor: colors.surfaceRaised },
+  thumbnailEmpty: { alignItems: 'center', justifyContent: 'center' },
+  thumbnailEmptyText: { color: colors.accent, fontSize: 24, fontWeight: '800' },
+  projectHeading: { flex: 1, gap: 4 },
+  status: { fontSize: 11, fontWeight: '700' },
+  statusComplete: { color: colors.success },
+  statusWarning: { color: colors.record },
   title: { color: colors.ink, fontSize: 15, fontWeight: '700' },
   subtitle: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   detail: { color: colors.inkMuted, fontSize: 12, lineHeight: 17, flexShrink: 1 },
