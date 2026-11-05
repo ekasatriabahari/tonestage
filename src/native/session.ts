@@ -75,7 +75,7 @@ export function buildManifest(args: {
             mixer: { backingVolume: mixer.backingVolume, backingMuted: mixer.backingMuted, masterVolume: mixer.masterVolume, eq: mixer.eq },
           },
     mix: { guitarVolume: mixer.guitarVolume, guitarMuted: mixer.guitarMuted },
-    offsets: { videoLatencyMs: 0, backingOffsetMs: 0 },
+    offsets: { ...mixer.exportDefaults },
   };
 }
 
