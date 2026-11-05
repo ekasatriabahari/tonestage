@@ -11,9 +11,10 @@ import { BackingTrackScreen } from './src/screens/BackingTrackScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { MixerScreen } from './src/screens/MixerScreen';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
+import { SyncSettingsScreen } from './src/screens/SyncSettingsScreen';
 import { colors } from './src/theme/colors';
 
-type Tab = 'camera' | 'audio' | 'backing' | 'mixer' | 'projects';
+type Tab = 'camera' | 'audio' | 'backing' | 'mixer' | 'projects' | 'sync';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'camera', label: 'Kamera' },
@@ -21,6 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'backing', label: 'Backing' },
   { id: 'mixer', label: 'Mixer' },
   { id: 'projects', label: 'Proyek' },
+  { id: 'sync', label: 'Sinkron' },
 ];
 
 function Shell() {
