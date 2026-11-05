@@ -150,12 +150,7 @@ export function useCombinedRecording(backing: BackingTrack) {
       guitarVolume: b.guitarVolume,
       guitarMuted: b.guitarMuted,
       eq: b.eq,
-      // chatgpt suggestion
-      exportDefaults: {
-        videoLatencyMs: 0,
-        backingOffsetMs: 0,
-      },
-      // ---------------
+      exportDefaults: { ...b.exportDefaults },
     };
     await startBackingLog();
     logActive.current = true;
