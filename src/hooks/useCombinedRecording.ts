@@ -14,8 +14,11 @@ import {
   type StorageInfo,
 } from '../native/session';
 import {
+  copyBackingTrackToSession,
   createSessionFolder,
+  generateSessionThumbnail,
   readStorage,
+  removeSession,
   saveSessionManifest,
 } from '../native/sessions';
 import type { MixerSettings } from '../native/mixerSettings';
@@ -35,6 +38,7 @@ type SessionRef = {
   createdMs: number;
   videoPath: string;
   audioPath: string;
+  backingUri: string | null;
 };
 
 /**
@@ -140,8 +144,17 @@ export function useCombinedRecording(backing: BackingTrack) {
       await fail(created.message);
       return;
     }
-    session.current = created;
     const b = latest.current;
+    let projectBackingUri: string | null = null;
+    if (b.loadedUri !== null && b.loaded !== null) {
+      projectBackingUri = await copyBackingTrackToSession(created.id, b.loadedUri, b.loaded.name);
+      if (projectBackingUri === null) {
+        await removeSession(created.id);
+        await fail('Backing track tidak dapat disalin ke project. Pilih ulang file lalu coba lagi.');
+        return;
+      }
+    }
+    session.current = { ...created, backingUri: projectBackingUri };
     // The mixer settings in use when recording starts are the ones the export will use.
     mixer.current = {
       backingVolume: b.volume,
@@ -212,26 +225,27 @@ export function useCombinedRecording(backing: BackingTrack) {
       audio: audioResult,
       audioDevice: audioChoice,
       backing:
-        backingLog !== null && b.loadedUri !== null
+        backingLog !== null && current.backingUri !== null
           ? {
-              uri: b.loadedUri,
+              uri: current.backingUri,
               name: b.loaded === null ? '' : b.loaded.name,
               log: backingLog,
             }
           : null,
       mixer: mixer.current,
     });
-    saveSessionManifest(current.id, JSON.stringify(manifest)).then(ok => {
+    (async () => {
+      // Thumbnail is derived from the raw video; the source is never modified.
+      await generateSessionThumbnail(current.id);
+      const ok = await saveSessionManifest(current.id, JSON.stringify(manifest));
       if (ok) {
         setSavedId(current.id);
         setPhase('finished');
       } else {
-        setMessage(
-          'Manifest sesi tidak dapat disimpan. File mentah masih ada di tab Proyek.',
-        );
+        setMessage('Manifest sesi tidak dapat disimpan. File mentah masih ada di tab Proyek.');
         setPhase('error');
       }
-    });
+    })();
   }, [
     phase,
     videoStats,
