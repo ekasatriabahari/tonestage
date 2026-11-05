@@ -66,6 +66,7 @@ internal class SessionStore(private val context: Context) {
         .put("id", id)
         .put("createdMs", now)
         .put("status", "recording")
+        .put("title", "Guitar Cover")
         .put("video", JSONObject().put("path", video.absolutePath))
         .put("guitar", JSONObject().put("path", guitar.absolutePath))
         .put("exports", JSONArray())
