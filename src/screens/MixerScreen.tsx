@@ -31,13 +31,13 @@ function VolumeRow({
   return (
     <View style={styles.gap}>
       <View style={styles.volumeRow}>
-        <Pressable onPress={() => onVolume(volume - 0.1)} accessibilityRole="button" style={styles.smallButton}>
+        <Pressable onPress={() => onVolume(volume - 0.1)} accessibilityRole="button" accessibilityLabel={`Kurangi ${muteLabel ?? 'volume'}`} style={styles.smallButton}>
           <Text style={styles.smallText}>-</Text>
         </Pressable>
         <View style={styles.volumeBar}>
           <TapBar fraction={volume} onChange={onVolume} />
         </View>
-        <Pressable onPress={() => onVolume(volume + 0.1)} accessibilityRole="button" style={styles.smallButton}>
+        <Pressable onPress={() => onVolume(volume + 0.1)} accessibilityRole="button" accessibilityLabel={`Tambah ${muteLabel ?? 'volume'}`} style={styles.smallButton}>
           <Text style={styles.smallText}>+</Text>
         </Pressable>
       </View>
@@ -93,6 +93,7 @@ export function MixerScreen({ bt, active }: Props) {
       {/* ---- Guitar ------------------------------------------------------------------------- */}
       <View style={styles.card}>
         <Text style={styles.title}>Gitar (input USB)</Text>
+        <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Kontrol volume dan mute di halaman ini hanya mengatur gitar pada hasil export, bukan level atau isi WAV mentah.</Text>
         <Text style={styles.detail}>
           {usb === undefined
             ? 'Tidak ada perangkat USB terdeteksi. Sambungkan SPM dengan kabel OTG.'
@@ -119,18 +120,20 @@ export function MixerScreen({ bt, active }: Props) {
           Level ini adalah level SUMBER (yang akan direkam) dan tidak terpengaruh volume atau mute di bawah. Mute dan volume gitar
           hanya memengaruhi campuran ekspor nanti, bukan file rekaman gitar bersih.
         </Text>
-        <Text style={styles.subtitle}>Volume gitar di campuran</Text>
+        <Text style={styles.subtitle}>Level gitar pada hasil export</Text>
         <VolumeRow
           volume={bt.guitarVolume}
           muted={bt.guitarMuted}
           onVolume={bt.setGuitarVolume}
           onToggleMute={bt.toggleGuitarMute}
+          muteLabel="Gitar"
         />
       </View>
 
       {/* ---- Backing track ---------------------------------------------------------------------- */}
       <View style={styles.card}>
         <Text style={styles.title}>Backing track</Text>
+        <Text style={styles.note}>Pengaturan berikut hanya memproses backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.detail}>
           {bt.loaded === null
             ? 'Belum ada file. Pilih di tab Backing.'
@@ -148,8 +151,9 @@ export function MixerScreen({ bt, active }: Props) {
 
       {/* ---- Master / monitor ----------------------------------------------------------------------- */}
       <View style={styles.card}>
-        <Text style={styles.title}>Master dan output pemantauan</Text>
-        <Text style={styles.subtitle}>Volume master (output backing track)</Text>
+        <Text style={styles.title}>Output dan pemantauan</Text>
+        <Text style={styles.subtitle}>Master backing track</Text>
+        <Text style={styles.note}>Master ini mengatur level akhir backing track. Tidak mengubah volume gitar.</Text>
         <VolumeRow volume={bt.masterVolume} muted={false} onVolume={bt.setMasterVolume} />
         <Text style={styles.subtitle}>Output</Text>
         <OutputPicker devices={bt.devices} selectedId={bt.outputId} onSelect={bt.selectOutput} />
