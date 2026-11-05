@@ -19,14 +19,14 @@ export const DEFAULT_MIXER: MixerSettings = {
   guitarVolume: 1,
   guitarMuted: false,
   eq: DEFAULT_EQ,
-  exportDefaults: { videoLatencyMs: 0, backingOffsetMs: 0 },
+  exportDefaults: { videoLatencyMs: 0, backingOffsetMs: 100 },
 };
 
 const unit = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, Math.round(v * 100) / 100)) : fallback;
 
-const offset = (v: unknown): number =>
-  typeof v === 'number' && Number.isFinite(v) ? Math.min(3000, Math.max(-1000, Math.round(v))) : 0;
+const offset = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.min(3000, Math.max(-1000, Math.round(v))) : fallback;
 
 /** Never throws: an empty or damaged value gives the defaults. */
 export function parseMixerSettings(json: string): MixerSettings {
@@ -45,8 +45,9 @@ export function parseMixerSettings(json: string): MixerSettings {
     guitarMuted: e.guitarMuted === true,
     eq: sanitizeEq(e.eq),
     exportDefaults: {
-      videoLatencyMs: offset((e.exportDefaults as Record<string, unknown> | undefined)?.videoLatencyMs),
-      backingOffsetMs: offset((e.exportDefaults as Record<string, unknown> | undefined)?.backingOffsetMs),
+      videoLatencyMs: offset((e.exportDefaults as Record<string, unknown> | undefined)?.videoLatencyMs, DEFAULT_MIXER.exportDefaults.videoLatencyMs),
+      // Older installs have no backing offset saved yet; migrate them to the measured +100 ms baseline.
+      backingOffsetMs: offset((e.exportDefaults as Record<string, unknown> | undefined)?.backingOffsetMs, DEFAULT_MIXER.exportDefaults.backingOffsetMs),
     },
   };
 }
