@@ -33,13 +33,13 @@ describe('backing log', () => {
 
 describe('manifest', () => {
   it('stores what was measured, and the mixer settings used while recording', () => {
-    const m = buildManifest({ id: 's_1', createdMs: 1, video, audio, audioDevice: { name: 'SPM', isUsb: true }, backing: { uri: 'content://a', name: 'a.mp3', log }, mixer: { ...DEFAULT_MIXER, backingVolume: 0.7, guitarMuted: true } });
+    const m = buildManifest({ id: 's_1', createdMs: 1, video, audio, audioDevice: { name: 'SPM', isUsb: true }, backing: { uri: 'content://a', name: 'a.mp3', log }, mixer: { ...DEFAULT_MIXER, backingVolume: 0.7, guitarMuted: true, exportDefaults: { videoLatencyMs: 35, backingOffsetMs: 100 } } });
     expect(m.video.firstSampleUs).toBe(5_000_000);
     expect(m.guitar).toMatchObject({ startUs: 4_900_000, isUsb: true, deviceName: 'SPM', timing: 'timestamp' });
     expect(m.backing).toMatchObject({ uri: 'content://a', mixer: { backingVolume: 0.7 } });
     expect(m.backing?.runs).toHaveLength(1);
     expect(m.mix).toEqual({ guitarVolume: 1, guitarMuted: true });
-    expect(m.offsets).toEqual({ videoLatencyMs: 0, backingOffsetMs: 0 });
+    expect(m.offsets).toEqual({ videoLatencyMs: 35, backingOffsetMs: 100 });
   });
 
   it('has no backing entry when nothing was playing, and no guitar entry without audio', () => {
