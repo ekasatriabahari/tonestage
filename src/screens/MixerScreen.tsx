@@ -58,9 +58,8 @@ function VolumeRow({
 }
 
 /**
- * Mixer: guitar (USB input), backing track, and master/monitor output. The levels of the guitar
- * are the levels of the SOURCE, as they are recorded. The mixer volume, mute and EQ never change the
- * clean guitar recording.
+ * Mixer controls for the exported mix and backing playback. Guitar volume/mute affect only the
+ * mix; the clean guitar WAV remains untouched. EQ is applied to backing only.
  */
 export function MixerScreen({ bt, active }: Props) {
   const insets = useSafeAreaInsets();
@@ -93,6 +92,7 @@ export function MixerScreen({ bt, active }: Props) {
       {/* ---- Guitar ------------------------------------------------------------------------- */}
       <View style={styles.card}>
         <Text style={styles.title}>Gitar (input USB)</Text>
+        <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Volume dan mute di bawah hanya mengatur gitar pada hasil export; WAV mentah tetap bersih.</Text>
         <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Kontrol volume dan mute di halaman ini hanya mengatur gitar pada hasil export, bukan level atau isi WAV mentah.</Text>
         <Text style={styles.detail}>
           {usb === undefined
@@ -133,6 +133,7 @@ export function MixerScreen({ bt, active }: Props) {
       {/* ---- Backing track ---------------------------------------------------------------------- */}
       <View style={styles.card}>
         <Text style={styles.title}>Backing track</Text>
+        <Text style={styles.note}>Volume, mute, dan EQ berikut hanya memengaruhi backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.note}>Pengaturan berikut hanya memproses backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.detail}>
           {bt.loaded === null
