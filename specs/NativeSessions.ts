@@ -2,7 +2,7 @@ import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
 /**
- * Recording sessions and export (Milestones 4 and 5). Implemented in Kotlin:
+ * Recording sessions and export (Project storage and export). Implemented in Kotlin:
  * android/app/src/main/java/com/tonestage/app/session/
  *
  * A session folder in the app's private storage holds the raw camera video, the clean guitar WAV
@@ -11,6 +11,12 @@ import { TurboModuleRegistry } from 'react-native';
 export interface Spec extends TurboModule {
   /** Creates a session folder. JSON {ok, error, id, createdMs, videoPath, audioPath}. */
   createSession(): Promise<string>;
+
+  /** Copies a picked backing-track URI into this project's private folder and returns its file URI. */
+  copyBackingTrack(id: string, uri: string, displayName: string): Promise<string>;
+
+  /** Generates a JPEG thumbnail from the recorded source video. Returns an absolute path or ''. */
+  generateThumbnail(id: string): Promise<string>;
 
   /** Stores the manifest (JSON text) of a session. Resolves false if the session does not exist. */
   saveManifest(id: string, json: string): Promise<boolean>;
