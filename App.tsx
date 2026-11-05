@@ -35,7 +35,7 @@ function Shell() {
   return (
     <View style={styles.root}>
       <View style={[styles.pane, tab !== 'camera' && styles.hidden]}>
-        <CameraScreen backing={backing} />
+        <CameraScreen backing={backing} screenActive={tab === 'camera'} />
       </View>
       <View style={[styles.pane, tab !== 'audio' && styles.hidden]}>
         <AudioScreen active={tab === 'audio'} />
