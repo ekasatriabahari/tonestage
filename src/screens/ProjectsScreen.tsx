@@ -122,7 +122,7 @@ export function ProjectsScreen({
                 </View>
               )}
               <View style={styles.projectHeading}>
-                <Text style={styles.title}>Guitar Cover</Text>
+                <Text style={styles.title}>{typeof session.manifest?.title === 'string' ? session.manifest.title : 'Guitar Cover'}</Text>
                 <Text style={styles.detail}>{formatDateTime(session.createdMs)}</Text>
                 <Text style={[styles.status, session.status === 'complete' ? styles.statusComplete : styles.statusWarning]}>
                   {session.status === 'complete' ? 'Project siap' : session.status === 'interrupted' ? 'Rekaman terputus — raw dipertahankan' : session.status === 'recording' ? 'Sedang merekam' : 'Perlu pemulihan'}
