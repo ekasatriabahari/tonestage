@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { RecordingPanel } from '../components/RecordingPanel';
+import { MiniStudioPanel } from '../components/MiniStudioPanel';
 import { YiLivePreview } from '../components/YiLivePreview';
 import type { BackingTrack } from '../hooks/useBackingTrack';
 import { useCombinedRecording } from '../hooks/useCombinedRecording';
@@ -102,6 +103,7 @@ export function CameraScreen({ backing }: { backing: BackingTrack }) {
             onRecordingEvent={rec.onVideoEvent}
           />
           <RecordingPanel rec={rec} />
+          <MiniStudioPanel backing={backing} active={cameraActive} />
         </>
       ) : (
         <View style={styles.preview}>
