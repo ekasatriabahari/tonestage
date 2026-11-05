@@ -1,8 +1,12 @@
 package com.tonestage.app.session
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.StatFs
 import java.io.File
+import java.io.FileOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -53,14 +57,35 @@ internal class SessionStore(private val context: Context) {
     json.put("error", "")
     json.put("id", id)
     json.put("createdMs", now)
-    json.put("videoPath", File(folder, "video.mp4").absolutePath)
-    json.put("audioPath", File(folder, "guitar.wav").absolutePath)
+    val video = File(folder, "video.mp4")
+    val guitar = File(folder, "guitar.wav")
+    json.put("videoPath", video.absolutePath)
+    json.put("audioPath", guitar.absolutePath)
+    val draft = JSONObject()
+        .put("version", 2)
+        .put("id", id)
+        .put("createdMs", now)
+        .put("status", "recording")
+        .put("video", JSONObject().put("path", video.absolutePath))
+        .put("guitar", JSONObject().put("path", guitar.absolutePath))
+        .put("exports", JSONArray())
+    saveManifest(id, draft.toString())
     return json
   }
 
   fun saveManifest(id: String, json: String): Boolean {
     val folder = dir(id) ?: return false
-    File(folder, "session.json").writeText(json)
+    val target = File(folder, "session.json")
+    val temporary = File(folder, "session.json.tmp")
+    temporary.writeText(json)
+    if (target.exists() && !target.delete()) {
+      temporary.delete()
+      return false
+    }
+    if (!temporary.renameTo(target)) {
+      temporary.delete()
+      return false
+    }
     return true
   }
 
@@ -85,7 +110,12 @@ internal class SessionStore(private val context: Context) {
       json.put("id", folder.name)
       json.put("createdMs", folder.name.removePrefix("s_").toLongOrNull() ?: folder.lastModified())
       val manifest = readManifest(folder.name)
+      val thumbnail = File(folder, "thumbnail.jpg")
+      if (!thumbnail.exists() && File(folder, "video.mp4").exists()) createThumbnail(folder.name)
       json.put("manifest", manifest ?: JSONObject.NULL)
+      val savedStatus = manifest?.optString("status", "ready") ?: "recovery_required"
+      json.put("status", if (savedStatus == "recording") "interrupted" else savedStatus)
+      json.put("thumbnailPath", if (thumbnail.exists()) thumbnail.absolutePath else "")
       json.put("videoBytes", File(folder, "video.mp4").let { if (it.exists()) it.length() else 0L })
       json.put("guitarBytes", File(folder, "guitar.wav").let { if (it.exists()) it.length() else 0L })
       val exports = JSONArray()
@@ -114,12 +144,67 @@ internal class SessionStore(private val context: Context) {
     val folder = dir(id) ?: return false
     File(folder, "video.mp4").delete()
     File(folder, "guitar.wav").delete()
+    folder.listFiles { file -> file.name.startsWith("backing_source.") }?.forEach { it.delete() }
+    File(folder, "thumbnail.jpg").delete()
     val manifest = readManifest(id)
     if (manifest != null) {
       manifest.put("rawDeleted", true)
       saveManifest(id, manifest.toString())
     }
     return true
+  }
+
+  /** Copies a user-selected content URI into the project for reliable re-export. */
+  fun copyBackingTrack(id: String, source: Uri, displayName: String): String? {
+    val folder = dir(id) ?: return null
+    val rawExtension = displayName.substringAfterLast('.', "").lowercase()
+    val extension = if (rawExtension.matches(Regex("[a-z0-9]{2,5}"))) rawExtension
+      else when (context.contentResolver.getType(source)) {
+        "audio/mpeg" -> "mp3"
+        "audio/wav", "audio/x-wav" -> "wav"
+        "audio/mp4", "audio/m4a" -> "m4a"
+        "audio/aac" -> "aac"
+        "audio/ogg" -> "ogg"
+        "audio/flac" -> "flac"
+        else -> "audio"
+      }
+    val target = File(folder, "backing_source.$extension")
+    return try {
+      val input = context.contentResolver.openInputStream(source) ?: return null
+      input.use { stream -> FileOutputStream(target).use { output -> stream.copyTo(output) } }
+      if (target.length() <= 0L) {
+        target.delete()
+        null
+      } else Uri.fromFile(target).toString()
+    } catch (e: Exception) {
+      target.delete()
+      null
+    }
+  }
+
+  /** Extracts one representative frame without modifying the raw video. */
+  fun createThumbnail(id: String): String? {
+    val folder = dir(id) ?: return null
+    val video = File(folder, "video.mp4")
+    if (!video.exists() || video.length() <= 0L) return null
+    val target = File(folder, "thumbnail.jpg")
+    val retriever = MediaMetadataRetriever()
+    return try {
+      retriever.setDataSource(video.absolutePath)
+      val frame = retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
+      FileOutputStream(target).use { output ->
+        if (!frame.compress(Bitmap.CompressFormat.JPEG, 88, output)) {
+          target.delete()
+          return null
+        }
+      }
+      target.absolutePath
+    } catch (e: Exception) {
+      target.delete()
+      null
+    } finally {
+      retriever.release()
+    }
   }
 
   fun storage(): JSONObject {
