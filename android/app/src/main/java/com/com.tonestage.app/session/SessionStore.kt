@@ -70,7 +70,12 @@ internal class SessionStore(private val context: Context) {
         .put("video", JSONObject().put("path", video.absolutePath))
         .put("guitar", JSONObject().put("path", guitar.absolutePath))
         .put("exports", JSONArray())
-    saveManifest(id, draft.toString())
+    if (!saveManifest(id, draft.toString())) {
+      folder.deleteRecursively()
+      json.put("ok", false)
+      json.put("error", "CANNOT_WRITE_MANIFEST")
+      return json
+    }
     return json
   }
 
