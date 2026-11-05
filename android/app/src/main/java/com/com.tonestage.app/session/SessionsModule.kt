@@ -2,6 +2,7 @@ package com.tonestage.app.session
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -23,6 +24,10 @@ class SessionsModule(reactContext: ReactApplicationContext) : NativeSessionsSpec
 
   private val appContext: Context = reactContext.applicationContext
   private val store = SessionStore(appContext)
+  init {
+    // Any draft left in "recording" state belongs to a previous process and is recoverable.
+    store.markInterruptedSessions()
+  }
   private val executor: ExecutorService = Executors.newSingleThreadExecutor()
   private val exportExecutor: ExecutorService = Executors.newSingleThreadExecutor()
   private val progress = ExportProgress()
