@@ -118,6 +118,18 @@ export function useCombinedRecording(backing: BackingTrack) {
     const fail = async (text: string) => {
       await finishAudio();
       await finishLog();
+      const current = session.current;
+      if (current !== null) {
+        await saveSessionManifest(current.id, JSON.stringify({
+          version: 2,
+          id: current.id,
+          createdMs: current.createdMs,
+          status: 'interrupted',
+          title: 'Guitar Cover',
+          video: { path: current.videoPath },
+          guitar: { path: current.audioPath },
+        }));
+      }
       setMessage(text);
       setPhase('error');
     };
@@ -213,6 +225,17 @@ export function useCombinedRecording(backing: BackingTrack) {
     }
     const current = session.current;
     if (videoStats === null || current === null || mixer.current === null) {
+      if (current !== null) {
+        saveSessionManifest(current.id, JSON.stringify({
+          version: 2,
+          id: current.id,
+          createdMs: current.createdMs,
+          status: 'interrupted',
+          title: 'Guitar Cover',
+          video: { path: current.videoPath },
+          guitar: { path: current.audioPath },
+        }));
+      }
       setPhase('error');
       return;
     }
