@@ -19,6 +19,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.math.log10
+import kotlin.math.roundToInt
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -28,7 +29,12 @@ internal class ExportProgress {
   @Volatile var cancelled = false
 }
 
-private class BackingRun(val startNanoUs: Long, val startFileUs: Long, val endNanoUs: Long)
+private class BackingRun(
+    val startNanoUs: Long,
+    val startFileUs: Long,
+    val endNanoUs: Long,
+    val slopePpm: Double,
+)
 
 /**
  * Builds the final MP4 from a recorded session:
@@ -259,7 +265,11 @@ internal object SessionExporter {
         if (b2 <= a2) {
           continue
         }
-        var fileStart = run.startFileUs + (a2 - a)
+        // slopePpm is the measured file-clock rate relative to System.nanoTime().
+        // -359 ppm means the file position advances 0.999641 us per system microsecond.
+        // Keep the output run on the system-time timeline; only the source read rate changes.
+        val clockRate = 1.0 + run.slopePpm.coerceIn(-5_000.0, 5_000.0) / 1_000_000.0
+        var fileStart = run.startFileUs + ((a2 - a) * clockRate).toLong()
         val outStart = (a2 - t0) * rate / 1_000_000L
         var runFrames = (b2 - a2) * rate / 1_000_000L
         if (outStart < written) {
@@ -268,13 +278,13 @@ internal object SessionExporter {
             continue
           }
           runFrames -= overlap
-          fileStart += overlap * 1_000_000L / rate
+          fileStart += (overlap * 1_000_000.0 / rate * clockRate).toLong()
         }
         pad(maxOf(outStart, written))
         var remaining = runFrames
         if (fileStart < 0) {
           // The log reaches back to before the track really started: silence until position 0.
-          val silence = minOf(remaining, (-fileStart * rate + 999_999L) / 1_000_000L)
+          val silence = minOf(remaining, kotlin.math.ceil(-fileStart.toDouble() * rate / (1_000_000.0 * clockRate)).toLong())
           pad(written + silence)
           remaining -= silence
           fileStart = 0
@@ -286,7 +296,10 @@ internal object SessionExporter {
         val decoder = PcmDecoder(context, uri)
         try {
           decoder.open(fileStart)
-          val resampler = Resampler(decoder.sampleRate, rate)
+          // Convert the measured source-clock rate into the output timeline. A negative drift
+          // makes the source slightly slower; a positive drift makes it slightly faster.
+          val effectiveInputRate = (decoder.sampleRate * clockRate).roundToInt().coerceAtLeast(1)
+          val resampler = Resampler(effectiveInputRate, rate)
           val filter = BiquadEq(rate, 2)
           filter.configure(eq)
           var finished = false
@@ -442,7 +455,8 @@ internal object SessionExporter {
       val start = item.optLong("startNanoUs", 0L)
       val end = item.optLong("endNanoUs", -1L)
       if (end > start) {
-        list.add(BackingRun(start, item.optLong("startFileUs", 0L), end))
+        val slope = item.optDouble("slopePpm", 0.0).takeIf { it.isFinite() } ?: 0.0
+        list.add(BackingRun(start, item.optLong("startFileUs", 0L), end, slope))
       }
     }
     return list
