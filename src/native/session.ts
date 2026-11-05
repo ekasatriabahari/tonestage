@@ -6,6 +6,7 @@ import type { RecordingStats } from './yiVideo';
 /** What is stored in session.json. All times are on the phone's System.nanoTime() clock (microseconds). */
 export type SessionManifest = {
   version: number;
+  status: 'recording' | 'complete' | 'interrupted';
   id: string;
   createdMs: number;
   video: { path: string; firstSampleUs: number; mediaDurationMs: number; frames: number; width: number; height: number };
@@ -37,7 +38,8 @@ export function buildManifest(args: {
 }): SessionManifest {
   const { video, audio, backing, mixer } = args;
   return {
-    version: 1,
+    version: 2,
+    status: 'complete',
     id: args.id,
     createdMs: args.createdMs,
     video: {
@@ -90,6 +92,8 @@ export type SessionInfo = {
   /** null when the manifest is missing (the recording did not finish). */
   manifest: Record<string, unknown> | null;
   rawDeleted: boolean;
+  status: 'recording' | 'complete' | 'interrupted' | 'recovery_required' | 'ready';
+  thumbnailPath: string;
 };
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
@@ -132,6 +136,10 @@ export function parseSessionList(json: string): SessionInfo[] {
       exports,
       manifest,
       rawDeleted: manifest !== null && manifest.rawDeleted === true,
+      status: e.status === 'recording' || e.status === 'interrupted' || e.status === 'complete' || e.status === 'recovery_required'
+        ? e.status
+        : manifest !== null && manifest.status === 'complete' ? 'complete' : 'ready',
+      thumbnailPath: typeof e.thumbnailPath === 'string' ? e.thumbnailPath : '',
     });
   }
   return sessions;
