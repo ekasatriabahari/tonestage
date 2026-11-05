@@ -15,11 +15,11 @@ describe('mixer settings', () => {
     expect(parseMixerSettings(JSON.stringify({ backingVolume: 'loud', masterVolume: 7 }))).toMatchObject({ backingVolume: 0.8, masterVolume: 1 });
   });
 
-  it('keeps the saved export offsets, within limits, and defaults to zero', () => {
+  it('keeps saved export offsets and migrates older settings to the measured baseline', () => {
     const s = { ...DEFAULT_MIXER, exportDefaults: { videoLatencyMs: 12, backingOffsetMs: 14 } };
     expect(parseMixerSettings(serializeMixerSettings(s)).exportDefaults).toEqual({ videoLatencyMs: 12, backingOffsetMs: 14 });
-    expect(parseMixerSettings('{}').exportDefaults).toEqual({ videoLatencyMs: 0, backingOffsetMs: 0 });
-    expect(parseMixerSettings(JSON.stringify({ exportDefaults: { videoLatencyMs: 99999, backingOffsetMs: 'x' } })).exportDefaults).toEqual({ videoLatencyMs: 3000, backingOffsetMs: 0 });
+    expect(parseMixerSettings('{}').exportDefaults).toEqual({ videoLatencyMs: 0, backingOffsetMs: 100 });
+    expect(parseMixerSettings(JSON.stringify({ exportDefaults: { videoLatencyMs: 99999, backingOffsetMs: 'x' } } )).exportDefaults).toEqual({ videoLatencyMs: 3000, backingOffsetMs: 100 });
   });
 
   it('never allows more than 100% volume', () => {
