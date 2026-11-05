@@ -58,20 +58,40 @@ export function useSessions(active: boolean, defaults: { videoLatencyMs: number;
     return () => clearInterval(id);
   }, [exportingId]);
 
+  // Each session keeps the calibration captured when recording started.
+  // Global defaults are only the fallback for older manifests without offsets.
+  const baseOptionsFor = useCallback((id: string): ExportOptions => {
+    const session = sessions.find(item => item.id === id);
+    const stored = session?.manifest?.offsets;
+    const offsets = typeof stored === 'object' && stored !== null
+      ? stored as { videoLatencyMs?: unknown; backingOffsetMs?: unknown }
+      : null;
+    return {
+      ...DEFAULT_EXPORT_OPTIONS,
+      ...defaults,
+      videoLatencyMs: typeof offsets?.videoLatencyMs === 'number' && Number.isFinite(offsets.videoLatencyMs)
+        ? clampOffsetMs(offsets.videoLatencyMs)
+        : defaults.videoLatencyMs,
+      backingOffsetMs: typeof offsets?.backingOffsetMs === 'number' && Number.isFinite(offsets.backingOffsetMs)
+        ? clampOffsetMs(offsets.backingOffsetMs)
+        : defaults.backingOffsetMs,
+    };
+  }, [sessions, defaults]);
+
   const optionsFor = useCallback(
-    (id: string): ExportOptions => options[id] ?? { ...DEFAULT_EXPORT_OPTIONS, ...defaults },
-    [options, defaults],
+    (id: string): ExportOptions => options[id] ?? baseOptionsFor(id),
+    [options, baseOptionsFor],
   );
 
   const setOption = useCallback((id: string, patch: Partial<ExportOptions>) => {
     setOptions(prev => {
-      const next = { ...(prev[id] ?? { ...DEFAULT_EXPORT_OPTIONS, ...defaults }), ...patch };
+      const next = { ...(prev[id] ?? baseOptionsFor(id)), ...patch };
       return {
         ...prev,
         [id]: { ...next, videoLatencyMs: clampOffsetMs(next.videoLatencyMs), backingOffsetMs: clampOffsetMs(next.backingOffsetMs) },
       };
     });
-  }, [defaults]);
+  }, [baseOptionsFor]);
 
   const exportOne = useCallback(
     async (id: string) => {
