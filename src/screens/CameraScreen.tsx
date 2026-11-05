@@ -54,7 +54,7 @@ function describeState(state: YiState): StatusView {
  * Camera screen, step 3: sends the activation command, then shows the live preview.
  * "perintah aktivasi diterima" does NOT mean video is playing; only the preview box reports that.
  */
-export function CameraScreen({ backing }: { backing: BackingTrack }) {
+export function CameraScreen({ backing, screenActive }: { backing: BackingTrack; screenActive: boolean }) {
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(DEFAULT_YI_RTSP_URL);
   const { state, activate, deactivate } = useYiActivation();
@@ -114,7 +114,7 @@ export function CameraScreen({ backing }: { backing: BackingTrack }) {
         </View>
       )}
       <RecordingPanel rec={rec} />
-      <MiniStudioPanel backing={backing} active={cameraActive} />
+      <MiniStudioPanel backing={backing} active={screenActive} />
 
       <View style={styles.statusBlock}>
         <View style={styles.statusRow}>
