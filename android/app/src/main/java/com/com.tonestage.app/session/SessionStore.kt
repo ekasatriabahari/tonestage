@@ -114,7 +114,7 @@ internal class SessionStore(private val context: Context) {
       if (!thumbnail.exists() && File(folder, "video.mp4").exists()) createThumbnail(folder.name)
       json.put("manifest", manifest ?: JSONObject.NULL)
       val savedStatus = manifest?.optString("status", "ready") ?: "recovery_required"
-      json.put("status", if (savedStatus == "recording") "interrupted" else savedStatus)
+      json.put("status", savedStatus)
       json.put("thumbnailPath", if (thumbnail.exists()) thumbnail.absolutePath else "")
       json.put("videoBytes", File(folder, "video.mp4").let { if (it.exists()) it.length() else 0L })
       json.put("guitarBytes", File(folder, "guitar.wav").let { if (it.exists()) it.length() else 0L })
@@ -132,6 +132,18 @@ internal class SessionStore(private val context: Context) {
       result.put(json)
     }
     return result
+  }
+
+  /** Marks drafts from a previous app process as interrupted without deleting their raw data. */
+  fun markInterruptedSessions() {
+    val folders = root.listFiles { f -> f.isDirectory } ?: return
+    for (folder in folders) {
+      val manifest = readManifest(folder.name) ?: continue
+      if (manifest.optString("status") == "recording") {
+        manifest.put("status", "interrupted")
+        saveManifest(folder.name, manifest.toString())
+      }
+    }
   }
 
   fun delete(id: String): Boolean {
