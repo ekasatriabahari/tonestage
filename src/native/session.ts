@@ -40,6 +40,7 @@ export function buildManifest(args: {
   return {
     version: 2,
     status: 'complete',
+    title: 'Guitar Cover',
     id: args.id,
     createdMs: args.createdMs,
     video: {
@@ -138,7 +139,12 @@ export function parseSessionList(json: string): SessionInfo[] {
       rawDeleted: manifest !== null && manifest.rawDeleted === true,
       status: e.status === 'recording' || e.status === 'interrupted' || e.status === 'complete' || e.status === 'recovery_required'
         ? e.status
-        : manifest !== null && manifest.status === 'complete' ? 'complete' : 'ready',
+        : manifest !== null && (
+            manifest.status === 'complete' ||
+            (typeof manifest.video === 'object' && manifest.video !== null &&
+              typeof (manifest.video as Record<string, unknown>).mediaDurationMs === 'number' &&
+              (manifest.video as Record<string, unknown>).mediaDurationMs > 0)
+          ) ? 'complete' : 'ready',
       thumbnailPath: typeof e.thumbnailPath === 'string' ? e.thumbnailPath : '',
     });
   }
