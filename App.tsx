@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { BackHandler, Pressable, StatusBar, StyleSheet, Text, ToastAndroid, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AudioLines, Camera, FolderOpen, Settings } from 'lucide-react-native';
+import { ArrowLeft, AudioLines, Camera, FolderOpen, Settings } from 'lucide-react-native';
 import { useBackingTrack } from './src/hooks/useBackingTrack';
 import { useSessions } from './src/hooks/useSessions';
 import { AudioScreen } from './src/screens/AudioScreen';
@@ -33,7 +33,8 @@ function SettingsDetail({ page, onBack, backing, active }: {
   return (
     <View style={styles.detailPane}>
       <Pressable onPress={onBack} accessibilityRole="button" style={[styles.backButton, { paddingTop: Math.max(8, insets.top ? 4 : 8) }]}>
-        <Text style={styles.backText}>‹  Settings</Text>
+        <ArrowLeft size={20} color={colors.accent} strokeWidth={2.5} />
+        <Text style={styles.backText}>Settings</Text>
       </Pressable>
       {page === 'audio' ? <AudioScreen active={active} /> : null}
       {page === 'backing' ? <BackingTrackScreen bt={backing} /> : null}
@@ -47,6 +48,31 @@ function Shell() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('camera');
   const [settingsPage, setSettingsPage] = useState<SettingsPage>(null);
+  const lastBackPress = useRef(0);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Android back from a settings detail returns to the Settings list.
+      if (tab === 'settings' && settingsPage !== null) {
+        setSettingsPage(null);
+        lastBackPress.current = 0;
+        return true;
+      }
+
+      // At the app root, require two back presses to exit.
+      const now = Date.now();
+      if (now - lastBackPress.current < 2000) {
+        return false;
+      }
+
+      lastBackPress.current = now;
+      ToastAndroid.show('Tekan sekali lagi untuk keluar', ToastAndroid.SHORT);
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [tab, settingsPage]);
+
   const settingsDetailActive = tab === 'settings' && settingsPage !== null;
   const backingActive = tab === 'camera' || (settingsDetailActive && (settingsPage === 'backing' || settingsPage === 'mixer'));
   const backing = useBackingTrack(backingActive);
@@ -114,7 +140,7 @@ const styles = StyleSheet.create({
   pane: { flex: 1 },
   hidden: { display: 'none' },
   detailPane: { flex: 1, backgroundColor: colors.background },
-  backButton: { paddingHorizontal: 18, paddingBottom: 6, backgroundColor: colors.background },
+  backButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: colors.background, zIndex: 1, elevation: 2 },
   backText: { color: colors.accent, fontSize: 15, fontWeight: '700' },
   tabBar: {
     flexDirection: 'row',
