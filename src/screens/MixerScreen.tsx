@@ -106,7 +106,6 @@ export function MixerScreen({ bt, active }: Props) {
 
       {/* ---- Guitar ------------------------------------------------------------------------- */}
       <AccordionSection title="Gitar (input USB)" defaultExpanded>
-        <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Volume dan mute di bawah hanya mengatur gitar pada hasil export; WAV mentah tetap bersih.</Text>
         <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Kontrol volume dan mute di halaman ini hanya mengatur gitar pada hasil export, bukan level atau isi WAV mentah.</Text>
         <Text style={styles.detail}>
           {usb === undefined
@@ -146,11 +145,10 @@ export function MixerScreen({ bt, active }: Props) {
 
       {/* ---- Backing track ---------------------------------------------------------------------- */}
       <AccordionSection title="Backing track">
-        <Text style={styles.note}>Volume, mute, dan EQ berikut hanya memengaruhi backing track. File audio sumber tidak diubah.</Text>
-        <Text style={styles.note}>Pengaturan berikut hanya memproses backing track. File audio sumber tidak diubah.</Text>
+        <Text style={styles.note}>Volume, mute, dan EQ hanya memengaruhi backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.detail}>
           {bt.loaded === null
-            ? 'Belum ada file. Pilih di tab Backing.'
+            ? 'Belum ada file. Pilih backing track dari panel di tab Kamera.'
             : `${bt.loaded.name} | ${formatClock(status === null ? 0 : status.positionMs)} / ${formatClock(bt.loaded.durationMs)}`}
         </Text>
         <Text style={styles.subtitle}>Volume</Text>
