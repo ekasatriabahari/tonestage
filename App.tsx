@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AudioLines, Camera, FolderOpen, Settings } from 'lucide-react-native';
 import { useBackingTrack } from './src/hooks/useBackingTrack';
 import { useSessions } from './src/hooks/useSessions';
 import { AudioScreen } from './src/screens/AudioScreen';
@@ -15,12 +16,12 @@ import { colors } from './src/theme/colors';
 
 type Tab = 'camera' | 'projects' | 'pedalboard' | 'settings';
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'camera', label: 'Kamera', icon: '◉' },
-  { id: 'projects', label: 'Proyek', icon: '▤' },
-  { id: 'pedalboard', label: 'Pedal', icon: '♫' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
-];
+const TABS = [
+  { id: 'camera', label: 'Kamera', icon: Camera },
+  { id: 'projects', label: 'Proyek', icon: FolderOpen },
+  { id: 'pedalboard', label: 'Pedal', icon: AudioLines },
+  { id: 'settings', label: 'Settings', icon: Settings },
+] satisfies { id: Tab; label: string; icon: typeof Camera }[];
 
 function SettingsDetail({ page, onBack, backing, active }: {
   page: Exclude<SettingsPage, null>;
@@ -88,7 +89,7 @@ function Shell() {
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               style={styles.tab}>
-              <Text style={[styles.tabIcon, selected && styles.tabIconActive]}>{item.icon}</Text>
+              <item.icon size={22} strokeWidth={2} color={selected ? colors.accent : colors.inkMuted} />
               <Text style={[styles.tabText, selected && styles.tabTextActive]}>{item.label}</Text>
               {selected ? <View style={styles.activeMark} /> : null}
             </Pressable>
@@ -123,8 +124,6 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 4, gap: 2 },
-  tabIcon: { color: colors.inkMuted, fontSize: 21, lineHeight: 25 },
-  tabIconActive: { color: colors.accent },
   tabText: { color: colors.inkMuted, fontSize: 10, fontWeight: '600' },
   tabTextActive: { color: colors.accent },
   activeMark: { width: 16, height: 2, borderRadius: 1, backgroundColor: colors.accent, marginTop: 1 },
