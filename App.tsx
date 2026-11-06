@@ -32,7 +32,7 @@ function SettingsDetail({ page, onBack, backing, active }: {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.detailPane}>
-      <Pressable onPress={onBack} accessibilityRole="button" style={[styles.backButton, { paddingTop: Math.max(8, insets.top ? 4 : 8) }]}>
+      <Pressable onPress={onBack} accessibilityRole="button" style={[styles.backButton, { paddingTop: Math.max(insets.top, StatusBar.currentHeight ?? 0) + 8 }]}>
         <ArrowLeft size={20} color={colors.accent} strokeWidth={2.5} />
         <Text style={styles.backText}>Settings</Text>
       </Pressable>
