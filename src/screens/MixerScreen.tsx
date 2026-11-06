@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
@@ -14,6 +15,20 @@ import { describeSimultaneousIo, latencyBreakdown, monitoringNotes } from '../na
 import { colors } from '../theme/colors';
 
 type Props = { bt: BackingTrack; active: boolean };
+
+function AccordionSection({ title, children, defaultExpanded = false }: { title: string; children: ReactNode; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return (
+    <View style={styles.card}>
+      <Pressable onPress={() => setExpanded(value => !value)} accessibilityRole="button" accessibilityState={{ expanded }} style={styles.accordionHeader}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.accordionMark}>{expanded ? '−' : '+'}</Text>
+      </Pressable>
+      {expanded ? <View style={styles.accordionBody}>{children}</View> : null}
+    </View>
+  );
+}
+
 
 function VolumeRow({
   volume,
@@ -90,8 +105,7 @@ export function MixerScreen({ bt, active }: Props) {
       <BrandHeader />
 
       {/* ---- Guitar ------------------------------------------------------------------------- */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Gitar (input USB)</Text>
+      <AccordionSection title="Gitar (input USB)" defaultExpanded>
         <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Volume dan mute di bawah hanya mengatur gitar pada hasil export; WAV mentah tetap bersih.</Text>
         <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Kontrol volume dan mute di halaman ini hanya mengatur gitar pada hasil export, bukan level atau isi WAV mentah.</Text>
         <Text style={styles.detail}>
@@ -128,11 +142,10 @@ export function MixerScreen({ bt, active }: Props) {
           onToggleMute={bt.toggleGuitarMute}
           muteLabel="Gitar"
         />
-      </View>
+      </AccordionSection>
 
       {/* ---- Backing track ---------------------------------------------------------------------- */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Backing track</Text>
+      <AccordionSection title="Backing track">
         <Text style={styles.note}>Volume, mute, dan EQ berikut hanya memengaruhi backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.note}>Pengaturan berikut hanya memproses backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.detail}>
@@ -148,11 +161,10 @@ export function MixerScreen({ bt, active }: Props) {
           batas penuh" menghitung sampel tepat di 0 dBFS sampai Anda menekan Reset.
         </Text>
         <EqPanel eq={bt.eq} onChange={bt.setEq} />
-      </View>
+      </AccordionSection>
 
       {/* ---- Master / monitor ----------------------------------------------------------------------- */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Output dan pemantauan</Text>
+      <AccordionSection title="Output dan pemantauan">
         <Text style={styles.subtitle}>Master backing track</Text>
         <Text style={styles.note}>Master ini mengatur level akhir backing track. Tidak mengubah volume gitar.</Text>
         <VolumeRow volume={bt.masterVolume} muted={false} onVolume={bt.setMasterVolume} />
@@ -187,7 +199,7 @@ export function MixerScreen({ bt, active }: Props) {
             {note.text}
           </Text>
         ))}
-      </View>
+      </AccordionSection>
     </ScrollView>
   );
 }
@@ -195,7 +207,10 @@ export function MixerScreen({ bt, active }: Props) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 },
+  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14 },
+  accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
+  accordionBody: { gap: 8, paddingTop: 10 },
+  accordionMark: { color: colors.accent, fontSize: 22, fontWeight: '500' },
   title: { color: colors.ink, fontSize: 15, fontWeight: '700' },
   subtitle: { color: colors.accent, fontSize: 12, fontWeight: '700', marginTop: 6 },
   gap: { gap: 6 },
