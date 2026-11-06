@@ -78,7 +78,7 @@ describe('session list', () => {
 });
 
 describe('clock lines in the session summary', () => {
-  const base = { id: 's_9', createdMs: 1, videoBytes: 0, guitarBytes: 0, exports: [], rawDeleted: false };
+  const base = { id: 's_9', createdMs: 1, videoBytes: 0, guitarBytes: 0, exports: [], rawDeleted: false, status: 'complete' as const, thumbnailPath: '' };
   const manifest = (guitar: object, runs: object[]) => ({ video: { width: 640, height: 480, mediaDurationMs: 1000 }, guitar, backing: { name: 'a.mp3', runs } });
 
   it('shows how fast each clock runs, in ppm and ms per minute', () => {
