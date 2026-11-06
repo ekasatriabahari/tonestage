@@ -74,11 +74,15 @@ export function MiniStudioPanel({ backing, active }: { backing: BackingTrack; ac
         <View style={styles.trackInfo}>
           <Text style={styles.title}>Backing track</Text>
           <Text numberOfLines={1} style={styles.detail}>
-            {backing.loaded?.name ?? 'Belum ada file — pilih di tab Backing'}
+            {backing.loaded?.name ?? 'Belum ada file backing'}
           </Text>
         </View>
         <Text style={styles.time}>{formatClock(position)} / {formatClock(duration)}</Text>
       </View>
+      <Pressable onPress={backing.pick} disabled={backing.busy} accessibilityRole="button" style={[styles.pickButton, backing.busy && styles.disabled]}>
+        <Text style={styles.pickText}>{backing.busy ? 'Memuat file...' : backing.loaded ? 'Ganti backing track' : '＋ Pilih backing track'}</Text>
+      </Pressable>
+      {backing.message ? <Text style={styles.note}>{backing.message}</Text> : null}
       <TapBar
         fraction={duration > 0 ? position / duration : 0}
         onChange={fraction => backing.seekTo(fraction * duration)}
@@ -117,6 +121,8 @@ const styles = StyleSheet.create({
   trackHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   trackInfo: { flex: 1, gap: 2 },
   time: { color: colors.ink, fontSize: 11, fontWeight: '600' },
+  pickButton: { alignSelf: 'flex-start', borderColor: colors.accent, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8 },
+  pickText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   transport: { flexDirection: 'row', gap: 8 },
   transportButton: { borderColor: colors.accent, borderWidth: 1, borderRadius: 9, paddingHorizontal: 16, paddingVertical: 10 },
   transportText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
