@@ -7,6 +7,7 @@ import type { RecordingStats } from './yiVideo';
 export type SessionManifest = {
   version: number;
   status: 'recording' | 'complete' | 'interrupted';
+  title?: string;
   id: string;
   createdMs: number;
   video: { path: string; firstSampleUs: number; mediaDurationMs: number; frames: number; width: number; height: number };
@@ -143,7 +144,7 @@ export function parseSessionList(json: string): SessionInfo[] {
             manifest.status === 'complete' ||
             (typeof manifest.video === 'object' && manifest.video !== null &&
               typeof (manifest.video as Record<string, unknown>).mediaDurationMs === 'number' &&
-              (manifest.video as Record<string, unknown>).mediaDurationMs > 0)
+              Number((manifest.video as Record<string, unknown>).mediaDurationMs) > 0)
           ) ? 'complete' : 'ready',
       thumbnailPath: typeof e.thumbnailPath === 'string' ? e.thumbnailPath : '',
     });
