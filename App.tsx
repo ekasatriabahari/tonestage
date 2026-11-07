@@ -4,8 +4,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { ArrowLeft, AudioLines, Camera, FolderOpen, Settings } from 'lucide-react-native';
 import { useBackingTrack } from './src/hooks/useBackingTrack';
 import { useSessions } from './src/hooks/useSessions';
-import { AudioScreen } from './src/screens/AudioScreen';
 import { AboutScreen } from './src/screens/AboutScreen';
+import { AudioScreen } from './src/screens/AudioScreen';
 import { BackingTrackScreen } from './src/screens/BackingTrackScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { MixerScreen } from './src/screens/MixerScreen';
@@ -54,14 +54,12 @@ function Shell() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Android back from a settings detail returns to the Settings list.
       if (tab === 'settings' && settingsPage !== null) {
         setSettingsPage(null);
         lastBackPress.current = 0;
         return true;
       }
 
-      // At the app root, require two back presses to exit.
       const now = Date.now();
       if (now - lastBackPress.current < 2000) {
         return false;
