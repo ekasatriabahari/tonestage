@@ -1,5 +1,4 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { TapBar } from '../components/TapBar';
 import type { BackingTrack } from '../hooks/useBackingTrack';
@@ -26,7 +25,6 @@ const STATE_LABEL: Record<string, string> = {
  * the Mixer tab. The player runs in native code and keeps playing when you switch tabs.
  */
 export function BackingTrackScreen({ bt }: { bt: BackingTrack }) {
-  const insets = useSafeAreaInsets();
   const available = isBackingTrackAvailable();
   const status = bt.status;
   const state = status === null ? 'idle' : status.state;
@@ -36,7 +34,7 @@ export function BackingTrackScreen({ bt }: { bt: BackingTrack }) {
   const position = status === null ? 0 : status.positionMs;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: 16 }]}>
       <BrandHeader />
 
       {!available ? <Text style={styles.error}>{describeBackingError('MODULE_UNAVAILABLE')}</Text> : null}

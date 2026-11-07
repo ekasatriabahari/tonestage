@@ -1,5 +1,4 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { LevelMeterPanel } from '../components/LevelMeterPanel';
 import { SpmTestPanel } from '../components/SpmTestPanel';
@@ -63,7 +62,6 @@ function DeviceCard({ device }: { device: AudioInputDevice }) {
  * recording from a USB input (the microphone permission is requested only when you start a test).
  */
 export function AudioScreen({ active }: Props) {
-  const insets = useSafeAreaInsets();
   const { state, refresh } = useAudioInputs(active);
 
   const devices = state.kind === 'ready' ? state.devices : [];
@@ -72,7 +70,7 @@ export function AudioScreen({ active }: Props) {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
+      contentContainerStyle={[styles.content, { paddingTop: 16 }]}>
       <BrandHeader />
 
       <View style={styles.statusBlock}>

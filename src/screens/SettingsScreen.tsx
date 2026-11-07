@@ -3,13 +3,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { colors } from '../theme/colors';
 
-export type SettingsPage = 'audio' | 'backing' | 'mixer' | 'sync' | null;
+export type SettingsPage = 'audio' | 'backing' | 'mixer' | 'sync' | 'about' | null;
 
 const ITEMS: { id: Exclude<SettingsPage, null>; icon: string; title: string; description: string }[] = [
   { id: 'audio', icon: '⌁', title: 'USB Audio', description: 'Deteksi perangkat USB dan uji input gitar' },
   { id: 'backing', icon: '♫', title: 'Backing Track', description: 'Pemutar dan pengaturan sumber backing' },
   { id: 'mixer', icon: '☷', title: 'Mixer & EQ', description: 'Level gitar, EQ, output, dan monitoring' },
   { id: 'sync', icon: '⟷', title: 'Audio Sync', description: 'Kalibrasi sinkronisasi audio dan video' },
+  { id: 'about', icon: 'ⓘ', title: 'About Tone Stage', description: 'Informasi aplikasi, versi, dan pengembang' },
 ];
 
 export function SettingsScreen({ onOpen }: { onOpen: (page: Exclude<SettingsPage, null>) => void }) {
@@ -19,7 +20,7 @@ export function SettingsScreen({ onOpen }: { onOpen: (page: Exclude<SettingsPage
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
       <BrandHeader />
       <Text style={styles.heading}>Settings</Text>
-      <Text style={styles.intro}>Pengaturan perangkat, audio, dan recording ToneStage.</Text>
+      <Text style={styles.intro}>Pengaturan perangkat, audio, dan recording Tone Stage.</Text>
       {ITEMS.map(item => (
         <Pressable key={item.id} onPress={() => onOpen(item.id)} accessibilityRole="button" style={styles.item}>
           <View style={styles.iconBox}><Text style={styles.icon}>{item.icon}</Text></View>
@@ -31,7 +32,7 @@ export function SettingsScreen({ onOpen }: { onOpen: (page: Exclude<SettingsPage
         </Pressable>
       ))}
       <View style={styles.footer}>
-        <Text style={styles.footerTitle}>ToneStage</Text>
+        <Text style={styles.footerTitle}>TONE STAGE</Text>
         <Text style={styles.footerText}>Capture your sound. Create your stage.</Text>
       </View>
     </ScrollView>

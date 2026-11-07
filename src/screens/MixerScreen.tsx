@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { EqPanel } from '../components/EqPanel';
 import { MeterBars } from '../components/MeterBars';
@@ -77,7 +76,6 @@ function VolumeRow({
  * mix; the clean guitar WAV remains untouched. EQ is applied to backing only.
  */
 export function MixerScreen({ bt, active }: Props) {
-  const insets = useSafeAreaInsets();
   const { state: inputs } = useAudioInputs(active);
   const usb = inputs.kind === 'ready' ? inputs.devices.find(d => d.isUsb) : undefined;
   const guitar = useAudioMeter(usb === undefined ? -1 : usb.id, active);
@@ -101,7 +99,7 @@ export function MixerScreen({ bt, active }: Props) {
   const notes = monitoringNotes(bt.avgLatency, routed === undefined ? null : routed.type, routedIsUsb);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: 16 }]}>
       <BrandHeader />
 
       {/* ---- Guitar ------------------------------------------------------------------------- */}
