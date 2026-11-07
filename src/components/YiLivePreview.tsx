@@ -20,8 +20,8 @@ const RETRY_DELAY_MS = 1500;
 
 type Props = {
   source: string;
-  /** true: save the incoming video to an MP4; false: stop. */
-  recording?: boolean;
+  /** Saves the incoming video to this MP4 (inside the sessions folder); empty stops. */
+  recordingPath?: string;
   /** Tells the parent whether real video frames are being shown. */
   onVideoReady?: (ready: boolean) => void;
   onRecordingEvent?: (event: RecordingEvent) => void;
@@ -30,7 +30,7 @@ type Props = {
 /** Live preview. Mount it only while the camera control connection is active. */
 export function YiLivePreview({
   source,
-  recording = false,
+  recordingPath = '',
   onVideoReady,
   onRecordingEvent,
 }: Props) {
@@ -82,13 +82,14 @@ export function YiLivePreview({
   );
 
   const willRetry = video.kind === 'error' && attempt < MAX_AUTO_RETRIES;
+  const recording = recordingPath !== '';
 
   return (
     <View style={[styles.box, { aspectRatio: previewAspectRatio(video) }]}>
       <YiVideoView
         key={attempt}
         source={source}
-        recording={recording}
+        recordingPath={recordingPath}
         onPlayerState={onPlayerState}
         style={styles.fill}
       />

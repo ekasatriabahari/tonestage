@@ -2,6 +2,7 @@ package com.tonestage.app.session
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -23,6 +24,10 @@ class SessionsModule(reactContext: ReactApplicationContext) : NativeSessionsSpec
 
   private val appContext: Context = reactContext.applicationContext
   private val store = SessionStore(appContext)
+  init {
+    // Any draft left in "recording" state belongs to a previous process and is recoverable.
+    store.markInterruptedSessions()
+  }
   private val executor: ExecutorService = Executors.newSingleThreadExecutor()
   private val exportExecutor: ExecutorService = Executors.newSingleThreadExecutor()
   private val progress = ExportProgress()
@@ -36,6 +41,28 @@ class SessionsModule(reactContext: ReactApplicationContext) : NativeSessionsSpec
         promise.resolve(store.create().toString())
       } catch (e: Exception) {
         promise.reject("SESSION_ERROR", e.message ?: "Could not create the session")
+      }
+    }
+  }
+
+  override fun copyBackingTrack(id: String, uri: String, displayName: String, promise: Promise) {
+    executor.execute {
+      try {
+        val copied = store.copyBackingTrack(id, Uri.parse(uri), displayName)
+        if (copied == null) promise.reject("BACKING_COPY_FAILED", "Could not copy the backing track")
+        else promise.resolve(copied)
+      } catch (e: Exception) {
+        promise.reject("BACKING_COPY_FAILED", e.message ?: "Could not copy the backing track")
+      }
+    }
+  }
+
+  override fun generateThumbnail(id: String, promise: Promise) {
+    executor.execute {
+      try {
+        promise.resolve(store.createThumbnail(id) ?: "")
+      } catch (e: Exception) {
+        promise.resolve("")
       }
     }
   }

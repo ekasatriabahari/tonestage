@@ -40,6 +40,7 @@ const SAVE_DELAY_MS = 600;
  */
 export function useBackingTrack(active: boolean) {
   const [loaded, setLoaded] = useState<LoadedTrack | null>(null);
+  const [loadedUri, setLoadedUri] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<{ uri: string; name: string } | null>(null);
   const [status, setStatus] = useState<BackingStatus | null>(null);
   const [devices, setDevices] = useState<OutputDevice[]>([]);
@@ -50,6 +51,7 @@ export function useBackingTrack(active: boolean) {
   const [guitarVolume, setGuitarVolumeState] = useState(DEFAULT_MIXER.guitarVolume);
   const [guitarMuted, setGuitarMuted] = useState(DEFAULT_MIXER.guitarMuted);
   const [eq, setEqState] = useState<EqSettings>(DEFAULT_MIXER.eq);
+  const [exportDefaults, setExportDefaultsState] = useState(DEFAULT_MIXER.exportDefaults);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [meter, setMeter] = useState<MeterState | null>(null);
   const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
@@ -71,6 +73,7 @@ export function useBackingTrack(active: boolean) {
         setGuitarVolumeState(saved.guitarVolume);
         setGuitarMuted(saved.guitarMuted);
         setEqState(saved.eq);
+        setExportDefaultsState(saved.exportDefaults);
       }
       setSettingsLoaded(true);
     });
@@ -140,19 +143,22 @@ export function useBackingTrack(active: boolean) {
           guitarVolume,
           guitarMuted,
           eq,
+          exportDefaults,
         }),
       );
     }, SAVE_DELAY_MS);
     return () => clearTimeout(id);
-  }, [settingsLoaded, volume, muted, masterVolume, guitarVolume, guitarMuted, eq]);
+  }, [settingsLoaded, volume, muted, masterVolume, guitarVolume, guitarMuted, eq, exportDefaults]);
 
   const loadFromUri = useCallback(async (uri: string) => {
     const result = await loadBackingTrack(uri);
     if (result.ok) {
       setLoaded(result.track);
+      setLoadedUri(uri);
       setMessage(null);
     } else {
       setLoaded(null);
+      setLoadedUri(null);
       setMessage(result.message);
     }
   }, []);
@@ -212,6 +218,9 @@ export function useBackingTrack(active: boolean) {
   const toggleMute = useCallback(() => setMuted(m => !m), []);
   const toggleGuitarMute = useCallback(() => setGuitarMuted(m => !m), []);
   const setEq = useCallback((next: EqSettings) => setEqState(next), []);
+  const setExportDefaults = useCallback((videoLatencyMs: number, backingOffsetMs: number) => {
+    setExportDefaultsState({ videoLatencyMs, backingOffsetMs });
+  }, []);
 
   const resetClip = useCallback(() => {
     setMeter(prev => (prev === null ? prev : resetClipping(prev)));
@@ -229,6 +238,7 @@ export function useBackingTrack(active: boolean) {
 
   return {
     loaded,
+    loadedUri,
     lastFile,
     status,
     devices,
@@ -239,6 +249,7 @@ export function useBackingTrack(active: boolean) {
     guitarVolume,
     guitarMuted,
     eq,
+    exportDefaults,
     avgLatency,
     meter,
     message,
@@ -254,6 +265,7 @@ export function useBackingTrack(active: boolean) {
     setMasterVolume,
     setGuitarVolume,
     setEq,
+    setExportDefaults,
     toggleMute,
     toggleGuitarMute,
     resetClip,

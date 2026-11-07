@@ -226,6 +226,15 @@ class BackingTrackModule(reactContext: ReactApplicationContext) :
     promise.resolve(null)
   }
 
+  override fun startEventLog(promise: Promise) {
+    engine.startEventLog()
+    promise.resolve(null)
+  }
+
+  override fun stopEventLog(promise: Promise) {
+    promise.resolve(engine.stopEventLog().toString())
+  }
+
   override fun unload(promise: Promise) {
     executor.execute {
       engine.unload()

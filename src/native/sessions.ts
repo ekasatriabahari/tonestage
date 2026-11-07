@@ -53,6 +53,25 @@ export async function createSessionFolder(): Promise<CreatedSession | Failure> {
   }
 }
 
+export async function copyBackingTrackToSession(id: string, uri: string, displayName: string): Promise<string | null> {
+  if (NativeSessions == null) return null;
+  try {
+    return await NativeSessions.copyBackingTrack(id, uri, displayName);
+  } catch {
+    return null;
+  }
+}
+
+export async function generateSessionThumbnail(id: string): Promise<string | null> {
+  if (NativeSessions == null) return null;
+  try {
+    const path = await NativeSessions.generateThumbnail(id);
+    return path === '' ? null : path;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveSessionManifest(id: string, json: string): Promise<boolean> {
   if (NativeSessions == null) {
     return false;

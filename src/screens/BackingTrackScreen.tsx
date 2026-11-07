@@ -107,7 +107,7 @@ export function BackingTrackScreen({ bt }: { bt: BackingTrack }) {
           Waktu keluar suara:{' '}
           {playing ? (status !== null && status.hasAnchor ? 'tercatat tepat (timestamp)' : 'belum tersedia') : 'aktif saat memutar'}
         </Text>
-        <Text style={styles.note}>Volume, EQ, dan pilihan output ada di tab Mixer.</Text>
+        <Text style={styles.note}>Volume, EQ, dan pilihan output ada di Settings → Mixer & EQ.</Text>
       </View>
     </ScrollView>
   );

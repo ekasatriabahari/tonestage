@@ -29,6 +29,14 @@ export interface Spec extends TurboModule {
   /** volume is 0.0 to 1.0 (linear). */
   setGain(volume: number, muted: boolean): Promise<void>;
 
+  /**
+   * Starts recording which stretches of the file are really playing (System.nanoTime() clock).
+   * stopEventLog resolves with JSON {logStartUs, logEndUs, runs: [{startNanoUs, startFileUs, endNanoUs}]}:
+   * inside a run the file position at time t is startFileUs + (t - startNanoUs).
+   */
+  startEventLog(): Promise<void>;
+  stopEventLog(): Promise<string>;
+
   /** Master volume for the backing-track output, 0.0 to 1.0 (linear), on top of setGain. */
   setMasterGain(volume: number): Promise<void>;
 
@@ -51,7 +59,7 @@ export interface Spec extends TurboModule {
   /**
    * JSON {state, error, name, durationMs, positionMs, sampleRate, channels, hasAnchor,
    * anchorFileUs, anchorNanoUs, frames, peaks, rms, clippedTotal, routedDeviceId,
-   * routedDeviceName, requestedDeviceId, outputLatencyMs (-1 if unknown)}. While playing, the file position at system time t
+   * routedDeviceName, requestedDeviceId, outputLatencyMs (-1 if unknown), bufferMs, underruns}. While playing, the file position at system time t
    * (microseconds, System.nanoTime) is anchorFileUs + (t - anchorNanoUs) when hasAnchor.
    */
   getStatus(): Promise<string>;

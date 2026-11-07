@@ -19,11 +19,13 @@ import { parseRecordingStats } from '../src/native/yiVideo';
 
 const video = parseRecordingStats(JSON.stringify({ ok: true, path: '/f/sessions/s_1/video.mp4', width: 640, height: 480, frames: 300, mediaDurationMs: 10000, firstSampleUs: 5_000_000 }));
 const audio = parseAudioCaptureResult(JSON.stringify({ ok: true, path: '/f/sessions/s_1/guitar.wav', sampleRate: 44100, channels: 2, frames: 441000, startUs: 4_900_000, timing: 'timestamp', source: 'UNPROCESSED' }));
-const log = parseBackingLog(JSON.stringify({ logStartUs: 4_000_000, logEndUs: 16_000_000, runs: [{ startNanoUs: 6_000_000, startFileUs: 30_000_000, endNanoUs: 14_000_000 }, { startNanoUs: 15_000_000, startFileUs: 0, endNanoUs: -1 }, { startNanoUs: 9, startFileUs: 0, endNanoUs: 3 }, null] }));
+const log = parseBackingLog(JSON.stringify({ logStartUs: 4_000_000, logEndUs: 16_000_000, runs: [{ startNanoUs: 6_000_000, startFileUs: 30_000_000, endNanoUs: 14_000_000, slopePpm: 42.5, anchorSpanMs: 7500 }, { startNanoUs: 15_000_000, startFileUs: 0, endNanoUs: -1 }, { startNanoUs: 9, startFileUs: 0, endNanoUs: 3 }, null] }));
 
 describe('backing log', () => {
   it('keeps only finished runs that go forward in time', () => {
-    expect(log.runs).toEqual([{ startNanoUs: 6_000_000, startFileUs: 30_000_000, endNanoUs: 14_000_000 }]);
+    expect(log.runs).toEqual([{ startNanoUs: 6_000_000, startFileUs: 30_000_000, endNanoUs: 14_000_000, slopePpm: 42.5, anchorSpanMs: 7500 }]);
+    // a run without clock data still parses, with 0 meaning 'not measured'
+    expect(parseBackingLog(JSON.stringify({ runs: [{ startNanoUs: 1, endNanoUs: 5 }] })).runs[0]).toMatchObject({ slopePpm: 0, anchorSpanMs: 0 });
     expect(parseBackingLog('{}')).toEqual({ logStartUs: 0, logEndUs: 0, runs: [] });
     expect(() => parseBackingLog('nope')).toThrow();
   });
@@ -31,13 +33,13 @@ describe('backing log', () => {
 
 describe('manifest', () => {
   it('stores what was measured, and the mixer settings used while recording', () => {
-    const m = buildManifest({ id: 's_1', createdMs: 1, video, audio, audioDevice: { name: 'SPM', isUsb: true }, backing: { uri: 'content://a', name: 'a.mp3', log }, mixer: { ...DEFAULT_MIXER, backingVolume: 0.7, guitarMuted: true } });
+    const m = buildManifest({ id: 's_1', createdMs: 1, video, audio, audioDevice: { name: 'SPM', isUsb: true }, backing: { uri: 'content://a', name: 'a.mp3', log }, mixer: { ...DEFAULT_MIXER, backingVolume: 0.7, guitarMuted: true, exportDefaults: { videoLatencyMs: 35, backingOffsetMs: 100 } } });
     expect(m.video.firstSampleUs).toBe(5_000_000);
     expect(m.guitar).toMatchObject({ startUs: 4_900_000, isUsb: true, deviceName: 'SPM', timing: 'timestamp' });
     expect(m.backing).toMatchObject({ uri: 'content://a', mixer: { backingVolume: 0.7 } });
     expect(m.backing?.runs).toHaveLength(1);
     expect(m.mix).toEqual({ guitarVolume: 1, guitarMuted: true });
-    expect(m.offsets).toEqual({ videoLatencyMs: 0, backingOffsetMs: 0 });
+    expect(m.offsets).toEqual({ videoLatencyMs: 35, backingOffsetMs: 100 });
   });
 
   it('has no backing entry when nothing was playing, and no guitar entry without audio', () => {
@@ -72,6 +74,23 @@ describe('session list', () => {
     expect(lines.some(l => l.includes('2 bagian diputar'))).toBe(true);
     expect(summarizeSession(list[1])[0]).toContain('Tanpa manifest');
     expect(summarizeSession({ ...list[0], rawDeleted: true }).some(l => l.includes('sudah dihapus'))).toBe(true);
+  });
+});
+
+describe('clock lines in the session summary', () => {
+  const base = { id: 's_9', createdMs: 1, videoBytes: 0, guitarBytes: 0, exports: [], rawDeleted: false, status: 'complete' as const, thumbnailPath: '' };
+  const manifest = (guitar: object, runs: object[]) => ({ video: { width: 640, height: 480, mediaDurationMs: 1000 }, guitar, backing: { name: 'a.mp3', runs } });
+
+  it('shows how fast each clock runs, in ppm and ms per minute', () => {
+    const lines = summarizeSession({ ...base, manifest: manifest({ isUsb: true, sampleRate: 44100, measuredRateHz: 44102.205, timing: 'timestamp' }, [{ slopePpm: -30, anchorSpanMs: 20000 }, { slopePpm: 90, anchorSpanMs: 3000 }]) });
+    expect(lines.some(l => l.startsWith('Jam gitar: +50 ppm') && l.includes('+3.0 ms per menit'))).toBe(true);
+    expect(lines.some(l => l.startsWith('Jam backing track: -30 ppm') && l.includes('-1.8 ms per menit') && l.includes('20 dtk'))).toBe(true);
+  });
+
+  it('says nothing when a clock was not measured, and ignores runs that were too short', () => {
+    const lines = summarizeSession({ ...base, manifest: manifest({ isUsb: true, sampleRate: 44100, measuredRateHz: 0, timing: 'timestamp' }, [{ slopePpm: 90, anchorSpanMs: 3000 }]) });
+    expect(lines.some(l => l.startsWith('Jam gitar'))).toBe(false);
+    expect(lines.some(l => l.startsWith('Jam backing track'))).toBe(false);
   });
 });
 

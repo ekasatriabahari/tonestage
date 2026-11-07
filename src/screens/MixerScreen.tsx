@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
@@ -10,10 +11,24 @@ import { useAudioMeter } from '../hooks/useAudioMeter';
 import type { BackingTrack } from '../hooks/useBackingTrack';
 import { describeDeviceType } from '../native/audioDevices';
 import { describeOutputType, formatClock } from '../native/backingTrackLogic';
-import { describeSimultaneousIo, monitoringNotes } from '../native/mixerLogic';
+import { describeSimultaneousIo, latencyBreakdown, monitoringNotes } from '../native/mixerLogic';
 import { colors } from '../theme/colors';
 
 type Props = { bt: BackingTrack; active: boolean };
+
+function AccordionSection({ title, children, defaultExpanded = false }: { title: string; children: ReactNode; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return (
+    <View style={styles.card}>
+      <Pressable onPress={() => setExpanded(value => !value)} accessibilityRole="button" accessibilityState={{ expanded }} style={styles.accordionHeader}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.accordionMark}>{expanded ? '−' : '+'}</Text>
+      </Pressable>
+      {expanded ? <View style={styles.accordionBody}>{children}</View> : null}
+    </View>
+  );
+}
+
 
 function VolumeRow({
   volume,
@@ -31,13 +46,13 @@ function VolumeRow({
   return (
     <View style={styles.gap}>
       <View style={styles.volumeRow}>
-        <Pressable onPress={() => onVolume(volume - 0.1)} accessibilityRole="button" style={styles.smallButton}>
+        <Pressable onPress={() => onVolume(volume - 0.1)} accessibilityRole="button" accessibilityLabel={`Kurangi ${muteLabel ?? 'volume'}`} style={styles.smallButton}>
           <Text style={styles.smallText}>-</Text>
         </Pressable>
         <View style={styles.volumeBar}>
           <TapBar fraction={volume} onChange={onVolume} />
         </View>
-        <Pressable onPress={() => onVolume(volume + 0.1)} accessibilityRole="button" style={styles.smallButton}>
+        <Pressable onPress={() => onVolume(volume + 0.1)} accessibilityRole="button" accessibilityLabel={`Tambah ${muteLabel ?? 'volume'}`} style={styles.smallButton}>
           <Text style={styles.smallText}>+</Text>
         </Pressable>
       </View>
@@ -58,9 +73,8 @@ function VolumeRow({
 }
 
 /**
- * Mixer: guitar (USB input), backing track, and master/monitor output. The levels of the guitar
- * are the levels of the SOURCE, as they are recorded. The mixer volume, mute and EQ never change the
- * clean guitar recording.
+ * Mixer controls for the exported mix and backing playback. Guitar volume/mute affect only the
+ * mix; the clean guitar WAV remains untouched. EQ is applied to backing only.
  */
 export function MixerScreen({ bt, active }: Props) {
   const insets = useSafeAreaInsets();
@@ -83,6 +97,7 @@ export function MixerScreen({ bt, active }: Props) {
     routedName,
     routedIsUsb,
   });
+  const split = latencyBreakdown(bt.avgLatency, status === null ? -1 : status.bufferMs);
   const notes = monitoringNotes(bt.avgLatency, routed === undefined ? null : routed.type, routedIsUsb);
 
   return (
@@ -90,8 +105,8 @@ export function MixerScreen({ bt, active }: Props) {
       <BrandHeader />
 
       {/* ---- Guitar ------------------------------------------------------------------------- */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Gitar (input USB)</Text>
+      <AccordionSection title="Gitar (input USB)" defaultExpanded>
+        <Text style={styles.note}>Sinyal gitar direkam langsung dari SPM. Kontrol volume dan mute di halaman ini hanya mengatur gitar pada hasil export, bukan level atau isi WAV mentah.</Text>
         <Text style={styles.detail}>
           {usb === undefined
             ? 'Tidak ada perangkat USB terdeteksi. Sambungkan SPM dengan kabel OTG.'
@@ -118,21 +133,22 @@ export function MixerScreen({ bt, active }: Props) {
           Level ini adalah level SUMBER (yang akan direkam) dan tidak terpengaruh volume atau mute di bawah. Mute dan volume gitar
           hanya memengaruhi campuran ekspor nanti, bukan file rekaman gitar bersih.
         </Text>
-        <Text style={styles.subtitle}>Volume gitar di campuran</Text>
+        <Text style={styles.subtitle}>Level gitar pada hasil export</Text>
         <VolumeRow
           volume={bt.guitarVolume}
           muted={bt.guitarMuted}
           onVolume={bt.setGuitarVolume}
           onToggleMute={bt.toggleGuitarMute}
+          muteLabel="Gitar"
         />
-      </View>
+      </AccordionSection>
 
       {/* ---- Backing track ---------------------------------------------------------------------- */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Backing track</Text>
+      <AccordionSection title="Backing track">
+        <Text style={styles.note}>Volume, mute, dan EQ hanya memengaruhi backing track. File audio sumber tidak diubah.</Text>
         <Text style={styles.detail}>
           {bt.loaded === null
-            ? 'Belum ada file. Pilih di tab Backing.'
+            ? 'Belum ada file. Pilih backing track dari panel di tab Kamera.'
             : `${bt.loaded.name} | ${formatClock(status === null ? 0 : status.positionMs)} / ${formatClock(bt.loaded.durationMs)}`}
         </Text>
         <Text style={styles.subtitle}>Volume</Text>
@@ -143,12 +159,12 @@ export function MixerScreen({ bt, active }: Props) {
           batas penuh" menghitung sampel tepat di 0 dBFS sampai Anda menekan Reset.
         </Text>
         <EqPanel eq={bt.eq} onChange={bt.setEq} />
-      </View>
+      </AccordionSection>
 
       {/* ---- Master / monitor ----------------------------------------------------------------------- */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Master dan output pemantauan</Text>
-        <Text style={styles.subtitle}>Volume master (output backing track)</Text>
+      <AccordionSection title="Output dan pemantauan">
+        <Text style={styles.subtitle}>Master backing track</Text>
+        <Text style={styles.note}>Master ini mengatur level akhir backing track. Tidak mengubah volume gitar.</Text>
         <VolumeRow volume={bt.masterVolume} muted={false} onVolume={bt.setMasterVolume} />
         <Text style={styles.subtitle}>Output</Text>
         <OutputPicker devices={bt.devices} selectedId={bt.outputId} onSelect={bt.selectOutput} />
@@ -167,13 +183,21 @@ export function MixerScreen({ bt, active }: Props) {
         <Text style={styles.subtitle}>Input dan output bersamaan</Text>
         <Text style={[styles.detail, io.level === 'ok' && styles.ok]}>{io.text}</Text>
 
+        <Text style={styles.subtitle}>Jeda keluaran (perkiraan)</Text>
+        <Text style={styles.detail}>
+          {split === null
+            ? 'Terukur saat memutar.'
+            : `Buffer pemutar sekitar ${Math.round(split.bufferMs)} ms; sisanya (sistem Android, USB, perangkat) sekitar ${Math.round(split.restMs)} ms.`}
+          {status !== null && status.underruns >= 0 ? ` Buffer kehabisan data: ${status.underruns} kali.` : ''}
+        </Text>
+
         <Text style={styles.subtitle}>Catatan pemantauan</Text>
         {notes.map(note => (
           <Text key={note.text} style={note.level === 'warn' ? styles.warn : styles.detail}>
             {note.text}
           </Text>
         ))}
-      </View>
+      </AccordionSection>
     </ScrollView>
   );
 }
@@ -181,7 +205,10 @@ export function MixerScreen({ bt, active }: Props) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 },
+  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14 },
+  accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
+  accordionBody: { gap: 8, paddingTop: 10 },
+  accordionMark: { color: colors.accent, fontSize: 22, fontWeight: '500' },
   title: { color: colors.ink, fontSize: 15, fontWeight: '700' },
   subtitle: { color: colors.accent, fontSize: 12, fontWeight: '700', marginTop: 6 },
   gap: { gap: 6 },

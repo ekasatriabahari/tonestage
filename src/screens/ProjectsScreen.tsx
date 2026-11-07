@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import type { SessionsState } from '../hooks/useSessions';
@@ -15,7 +15,7 @@ import {
 import { isSessionsAvailable } from '../native/sessions';
 import { colors } from '../theme/colors';
 
-const STEPS = [-100, -10, 10, 100];
+const STEPS = [-100, -10, -5, -1, 1, 5, 10, 100];
 
 function Offset({
   label,
@@ -51,14 +51,46 @@ function Offset({
 }
 
 /** Recorded sessions: export to MP4 (again, with other offsets, as often as needed) and clean up. */
-export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
+export function ProjectsScreen({
+  sessions,
+  defaults,
+  onSaveDefaults,
+}: {
+  sessions: SessionsState;
+  defaults: { videoLatencyMs: number; backingOffsetMs: number };
+  onSaveDefaults: (videoLatencyMs: number, backingOffsetMs: number) => void;
+}) {
   const insets = useSafeAreaInsets();
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const busy = sessions.exportingId !== null;
+
+  // First tap asks "sure?", second tap deletes.
+  const tapDelete = (kind: 'raw' | 'all', id: string) => {
+    const key = `${kind}:${id}`;
+    if (confirm === key) {
+      setConfirm(null);
+      if (kind === 'raw') {
+        sessions.deleteRaw(id);
+      } else {
+        sessions.deleteSession(id);
+      }
+    } else {
+      setConfirm(key);
+    }
+  };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
       <BrandHeader />
+      <Text style={styles.libraryTitle}>{selectedId === null ? 'Project Library' : 'Project Detail'}</Text>
+      {selectedId !== null ? (
+        <Pressable onPress={() => setSelectedId(null)} accessibilityRole="button" style={styles.secondary}>
+          <Text style={styles.secondaryText}>Kembali ke Library</Text>
+        </Pressable>
+      ) : (
+        <Text style={styles.note}>{sessions.sessions.length} project tersimpan di perangkat ini.</Text>
+      )}
       {!isSessionsAvailable() ? <Text style={styles.error}>Modul sesi tidak tersedia di build ini.</Text> : null}
       {sessions.storage !== null ? (
         <Text style={styles.note}>
@@ -71,28 +103,44 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
       </Pressable>
       {sessions.sessions.length === 0 ? <Text style={styles.note}>Belum ada sesi. Rekam di tab Kamera.</Text> : null}
 
-      {sessions.sessions.map(session => {
+      {sessions.sessions.filter(session => selectedId === null || session.id === selectedId).map(session => {
         const options = sessions.optionsFor(session.id);
         const thisExport = sessions.exportingId === session.id;
         const result = sessions.results[session.id];
         const error = sessions.errors[session.id];
         const saved = sessions.saved[session.id];
-        const canExport = session.manifest !== null && !session.rawDeleted && !busy;
+        const canExport = session.status === 'complete' && session.manifest !== null && !session.rawDeleted && !busy;
         const hasBacking = session.manifest !== null && typeof session.manifest.backing === 'object' && session.manifest.backing !== null;
         return (
           <View key={session.id} style={styles.card}>
-            <Text style={styles.title}>{formatDateTime(session.createdMs)}</Text>
+            <Pressable onPress={() => setSelectedId(session.id)} accessibilityRole="button" style={styles.projectHeader}>
+              {session.thumbnailPath !== '' ? (
+                <Image source={{ uri: `file://${session.thumbnailPath}` }} style={styles.thumbnail} />
+              ) : (
+                <View style={[styles.thumbnail, styles.thumbnailEmpty]}>
+                  <Text style={styles.thumbnailEmptyText}>TS</Text>
+                </View>
+              )}
+              <View style={styles.projectHeading}>
+                <Text style={styles.title}>{typeof session.manifest?.title === 'string' ? session.manifest.title : 'Guitar Cover'}</Text>
+                <Text style={styles.detail}>{formatDateTime(session.createdMs)}</Text>
+                <Text style={[styles.status, session.status === 'complete' ? styles.statusComplete : styles.statusWarning]}>
+                  {session.status === 'complete' ? 'Project siap' : session.status === 'interrupted' ? 'Rekaman terputus — raw dipertahankan' : session.status === 'recording' ? 'Sedang merekam' : 'Perlu pemulihan'}
+                </Text>
+              </View>
+              <Text style={styles.openProject}>›</Text>
+            </Pressable>
             {summarizeSession(session).map(line => (
               <Text key={line} style={styles.detail}>
                 {line}
               </Text>
             ))}
 
-            {session.manifest !== null && !session.rawDeleted ? (
+            {session.status === 'complete' && session.manifest !== null && !session.rawDeleted ? (
               <>
                 <Offset
                   label="Penundaan video"
-                  help="Seberapa lambat gambar dibanding suaranya. Jika di hasil suara tepukan terdengar LEBIH DULU daripada gerak tangan, naikkan; jika terdengar lebih lambat, turunkan."
+                  help="Untuk GAMBAR vs SUARA (semua audio sekaligus). Jika suara tepukan terdengar LEBIH DULU daripada gerak tangan, naikkan; jika lebih lambat, turunkan. Ini tidak mengubah selisih gitar vs backing track."
                   value={options.videoLatencyMs}
                   onChange={ms => sessions.setOption(session.id, { videoLatencyMs: ms })}
                   disabled={busy}
@@ -101,7 +149,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
                   <>
                     <Offset
                       label="Geser backing track"
-                      help="Menggeser backing track terhadap gitar dan video (mis. jeda perangkat keluaran). Mulai dari 0; ubah hanya jika hasil uji menunjukkan selisih tetap."
+                      help="Untuk GITAR vs BACKING TRACK. Jika backing track terdengar lebih awal dari gitar, naikkan (backing digeser lebih lambat); jika lebih lambat, turunkan. Jeda SPM (USB masuk dan keluar) biasanya tetap, jadi cukup dicari sekali."
                       value={options.backingOffsetMs}
                       onChange={ms => sessions.setOption(session.id, { backingOffsetMs: ms })}
                       disabled={busy}
@@ -118,7 +166,16 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
                     </Pressable>
                   </>
                 ) : null}
-                <Text style={styles.note}>Rentang geser {OFFSET_MIN_MS} sampai {OFFSET_MAX_MS} ms.</Text>
+                <Text style={styles.note}>
+                  Rentang geser {OFFSET_MIN_MS} sampai {OFFSET_MAX_MS} ms. Bawaan tersimpan: video {defaults.videoLatencyMs} ms, backing {defaults.backingOffsetMs} ms.
+                </Text>
+                <Pressable
+                  onPress={() => onSaveDefaults(options.videoLatencyMs, options.backingOffsetMs)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  style={[styles.secondary, busy && styles.disabled]}>
+                  <Text style={styles.secondaryText}>Simpan angka ini sebagai bawaan</Text>
+                </Pressable>
                 <Pressable onPress={() => sessions.exportOne(session.id)} disabled={!canExport} accessibilityRole="button" style={[styles.primary, !canExport && styles.disabled]}>
                   <Text style={styles.primaryText}>{thisExport ? 'Mengekspor...' : session.exports.length > 0 ? 'Ekspor ulang MP4' : 'Ekspor MP4'}</Text>
                 </Pressable>
@@ -164,7 +221,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
             <View style={styles.dangerRow}>
               {!session.rawDeleted && session.manifest !== null ? (
                 <Pressable
-                  onPress={() => (confirm === `raw:${session.id}` ? (setConfirm(null), sessions.deleteRaw(session.id)) : setConfirm(`raw:${session.id}`))}
+                  onPress={() => tapDelete('raw', session.id)}
                   disabled={busy}
                   accessibilityRole="button"
                   style={[styles.danger, busy && styles.disabled]}>
@@ -172,7 +229,7 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => (confirm === `all:${session.id}` ? (setConfirm(null), sessions.deleteSession(session.id)) : setConfirm(`all:${session.id}`))}
+                onPress={() => tapDelete('all', session.id)}
                 disabled={busy}
                 accessibilityRole="button"
                 style={[styles.danger, busy && styles.disabled]}>
@@ -188,8 +245,18 @@ export function ProjectsScreen({ sessions }: { sessions: SessionsState }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  libraryTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 },
+  projectHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  thumbnail: { width: 112, height: 72, borderRadius: 9, backgroundColor: colors.surfaceRaised },
+  thumbnailEmpty: { alignItems: 'center', justifyContent: 'center' },
+  thumbnailEmptyText: { color: colors.accent, fontSize: 24, fontWeight: '800' },
+  projectHeading: { flex: 1, gap: 4 },
+  openProject: { color: colors.accent, fontSize: 28, fontWeight: '600' },
+  status: { fontSize: 11, fontWeight: '700' },
+  statusComplete: { color: colors.success },
+  statusWarning: { color: colors.record },
   title: { color: colors.ink, fontSize: 15, fontWeight: '700' },
   subtitle: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   detail: { color: colors.inkMuted, fontSize: 12, lineHeight: 17, flexShrink: 1 },
@@ -198,7 +265,7 @@ const styles = StyleSheet.create({
   ok: { color: colors.success, fontSize: 12, lineHeight: 17 },
   disabled: { opacity: 0.4 },
   offset: { gap: 6 },
-  stepRow: { flexDirection: 'row', gap: 8 },
+  stepRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   stepButton: { borderColor: colors.accent, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   stepText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   chip: { alignSelf: 'flex-start', borderColor: colors.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },

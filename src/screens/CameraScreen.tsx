@@ -10,7 +10,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { RecordingPanel } from '../components/RecordingPanel';
+import { MiniStudioPanel } from '../components/MiniStudioPanel';
 import { YiLivePreview } from '../components/YiLivePreview';
+import type { BackingTrack } from '../hooks/useBackingTrack';
 import { useCombinedRecording } from '../hooks/useCombinedRecording';
 import { useYiActivation, type YiState } from '../hooks/useYiActivation';
 import { isYiControlAvailable } from '../native/yiControl';
@@ -52,11 +54,11 @@ function describeState(state: YiState): StatusView {
  * Camera screen, step 3: sends the activation command, then shows the live preview.
  * "perintah aktivasi diterima" does NOT mean video is playing; only the preview box reports that.
  */
-export function CameraScreen() {
+export function CameraScreen({ backing, screenActive }: { backing: BackingTrack; screenActive: boolean }) {
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(DEFAULT_YI_RTSP_URL);
   const { state, activate, deactivate } = useYiActivation();
-  const rec = useCombinedRecording();
+  const rec = useCombinedRecording(backing);
   const { abort } = rec;
   const cameraActive = state.kind === 'active';
 
@@ -96,11 +98,10 @@ export function CameraScreen() {
         <>
           <YiLivePreview
             source={url.trim()}
-            recording={rec.videoRecording}
+            recordingPath={rec.videoRecordingPath}
             onVideoReady={rec.setVideoReady}
             onRecordingEvent={rec.onVideoEvent}
           />
-          <RecordingPanel rec={rec} />
         </>
       ) : (
         <View style={styles.preview}>
@@ -111,6 +112,24 @@ export function CameraScreen() {
           </Text>
         </View>
       )}
+      <Pressable
+        onPress={onPressMain}
+        disabled={!canPress}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canPress }}
+        style={[styles.primaryButton, !canPress && styles.primaryButtonDisabled]}>
+        <Text style={[styles.primaryButtonText, !canPress && styles.primaryButtonTextDisabled]}>
+          {buttonLabel}
+        </Text>
+      </Pressable>
+      <Text style={styles.helpText}>
+        {moduleAvailable
+          ? 'Sambungkan ponsel ke Wi-Fi kamera Yi (namanya mirip YDXJ_...), lalu tekan Hubungkan. Koneksi kontrol harus tetap terbuka agar video terus tampil.'
+          : 'Modul kontrol kamera tidak tersedia di build ini.'}
+      </Text>
+
+      <RecordingPanel rec={rec} />
+      <MiniStudioPanel backing={backing} active={screenActive} />
 
       <View style={styles.statusBlock}>
         <View style={styles.statusRow}>
@@ -156,21 +175,6 @@ export function CameraScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        onPress={onPressMain}
-        disabled={!canPress}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !canPress }}
-        style={[styles.primaryButton, !canPress && styles.primaryButtonDisabled]}>
-        <Text style={[styles.primaryButtonText, !canPress && styles.primaryButtonTextDisabled]}>
-          {buttonLabel}
-        </Text>
-      </Pressable>
-      <Text style={styles.helpText}>
-        {moduleAvailable
-          ? 'Sambungkan ponsel ke Wi-Fi kamera Yi (namanya mirip YDXJ_...), lalu tekan Hubungkan. Koneksi kontrol harus tetap terbuka agar video terus tampil.'
-          : 'Modul kontrol kamera tidak tersedia di build ini.'}
-      </Text>
     </ScrollView>
   );
 }
