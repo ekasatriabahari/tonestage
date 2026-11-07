@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
 import { OFFSET_MAX_MS, OFFSET_MIN_MS } from '../native/session';
 import { colors } from '../theme/colors';
@@ -45,7 +44,6 @@ export function SyncSettingsScreen({
   defaults: { videoLatencyMs: number; backingOffsetMs: number };
   onSave: (videoLatencyMs: number, backingOffsetMs: number) => void;
 }) {
-  const insets = useSafeAreaInsets();
   const [videoLatencyMs, setVideoLatencyMs] = useState(defaults.videoLatencyMs);
   const [backingOffsetMs, setBackingOffsetMs] = useState(defaults.backingOffsetMs);
 
@@ -53,7 +51,7 @@ export function SyncSettingsScreen({
   const changed = videoLatencyMs !== defaults.videoLatencyMs || backingOffsetMs !== defaults.backingOffsetMs;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: 16 }]}>
       <BrandHeader />
       <Text style={styles.heading}>Sinkronisasi</Text>
       <Text style={styles.intro}>Nilai di sini menjadi bawaan untuk sesi rekaman baru. Sesi lama tetap memakai kalibrasi masing-masing.</Text>
