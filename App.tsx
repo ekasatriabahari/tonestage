@@ -5,6 +5,7 @@ import { ArrowLeft, AudioLines, Camera, FolderOpen, Settings } from 'lucide-reac
 import { useBackingTrack } from './src/hooks/useBackingTrack';
 import { useSessions } from './src/hooks/useSessions';
 import { AudioScreen } from './src/screens/AudioScreen';
+import { AboutScreen } from './src/screens/AboutScreen';
 import { BackingTrackScreen } from './src/screens/BackingTrackScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { MixerScreen } from './src/screens/MixerScreen';
@@ -40,6 +41,7 @@ function SettingsDetail({ page, onBack, backing, active }: {
       {page === 'backing' ? <BackingTrackScreen bt={backing} /> : null}
       {page === 'mixer' ? <MixerScreen bt={backing} active={active} /> : null}
       {page === 'sync' ? <SyncSettingsScreen defaults={backing.exportDefaults} onSave={backing.setExportDefaults} /> : null}
+      {page === 'about' ? <AboutScreen /> : null}
     </View>
   );
 }
