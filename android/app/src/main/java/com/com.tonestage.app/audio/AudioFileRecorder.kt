@@ -110,7 +110,6 @@ internal class AudioFileRecorder {
   /** Stops recording and returns the measured result. */
   fun stop(): JSONObject {
     running = false
-    paused = false
     val worker = thread
     thread = null
     if (worker != null) {
