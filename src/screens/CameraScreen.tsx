@@ -75,9 +75,13 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
   const chooseSource = async (next: CameraSource) => {
     if (recordingLocked) return;
     if (next === 'yi') {
+      rec.setVideoReady(false);
       setSource('yi');
       return;
     }
+    rec.setVideoReady(false);
+    setSource(next);
+    if (isActive) deactivate();
     try {
       const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
       if (result !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -86,7 +90,6 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
       }
       setCameraPermission(true);
       setCameraPermissionMessage(null);
-      if (isActive) deactivate();
       setSource(next);
     } catch {
       setCameraPermissionMessage('Izin kamera tidak dapat diminta. Periksa pengaturan aplikasi Android.');
