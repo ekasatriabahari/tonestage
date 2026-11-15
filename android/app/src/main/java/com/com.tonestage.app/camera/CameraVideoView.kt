@@ -5,6 +5,8 @@ import android.media.MediaMetadataRetriever
 import android.util.Log
 import android.view.OrientationEventListener
 import android.view.Surface
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.graphics.SurfaceTexture
 import android.view.TextureView
 import android.widget.FrameLayout
@@ -38,6 +40,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private var pendingSurfaceRequest: androidx.camera.core.SurfaceRequest? = null
   private var activePreviewSurface: Surface? = null
   private var previewFrameReceived = false
+  private var previewRotationDegrees = 0
+  private var previewCropRect: RectF? = null
   private val orientationListener = object : OrientationEventListener(context) {
     override fun onOrientationChanged(orientation: Int) {
       if (orientation == ORIENTATION_UNKNOWN) return
@@ -96,6 +100,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     }
     previewTexture.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
       Log.d(TAG, "TextureView layout=${right - left}x${bottom - top} available=${previewTexture.isAvailable}")
+      applyPreviewTransform()
       providePendingSurface()
     }
     val future = ProcessCameraProvider.getInstance(context)
@@ -154,6 +159,12 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also { useCase ->
         useCase.setSurfaceProvider(mainExecutor) { request ->
           Log.d(TAG, "SurfaceProvider request resolution=${request.resolution} texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable}")
+          request.setTransformationInfoListener(mainExecutor) { info ->
+            previewRotationDegrees = info.rotationDegrees
+            previewCropRect = RectF(info.cropRect)
+            applyPreviewTransform()
+            Log.d(TAG, "preview transform rotation=${info.rotationDegrees} crop=${info.cropRect}")
+          }
           pendingSurfaceRequest = request
           providePendingSurface()
         }
@@ -182,6 +193,35 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     }
   }
 
+  /**
+   * Match CameraX's buffer orientation to the current preview container.
+   * TextureView otherwise stretches the camera buffer to the view bounds.
+   */
+  private fun applyPreviewTransform() {
+    val viewWidth = previewTexture.width.toFloat()
+    val viewHeight = previewTexture.height.toFloat()
+    if (viewWidth <= 0f || viewHeight <= 0f || !previewTexture.isAvailable) return
+
+    val bufferWidth = previewTexture.surfaceTexture?.let { preview ->
+      // SurfaceTexture buffer size is the CameraX output resolution.
+      previewCropRect?.width()?.takeIf { it > 0f } ?: viewWidth
+    } ?: return
+    val bufferHeight = previewCropRect?.height()?.takeIf { it > 0f } ?: viewHeight
+    val crop = previewCropRect ?: RectF(0f, 0f, bufferWidth, bufferHeight)
+    val matrix = Matrix()
+    matrix.setRotate(previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
+
+    val rotatedCrop = RectF(crop)
+    matrix.mapRect(rotatedCrop)
+    val scale = maxOf(viewWidth / rotatedCrop.width(), viewHeight / rotatedCrop.height())
+    matrix.postScale(scale, scale)
+    matrix.postTranslate(
+      viewWidth / 2f - rotatedCrop.centerX() * scale,
+      viewHeight / 2f - rotatedCrop.centerY() * scale
+    )
+    previewTexture.setTransform(matrix)
+  }
+
   /** Provide CameraX a Surface backed directly by TextureView. */
   private fun providePendingSurface() {
     val request = pendingSurfaceRequest ?: return
@@ -203,6 +243,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     try {
       texture.setDefaultBufferSize(resolution.width, resolution.height)
       previewFrameReceived = false
+      if (previewCropRect == null) previewCropRect = RectF(0f, 0f, resolution.width.toFloat(), resolution.height.toFloat())
+      applyPreviewTransform()
       val surface = Surface(texture)
       activePreviewSurface = surface
       Log.d(TAG, "provideSurface resolution=${resolution.width}x${resolution.height}")
