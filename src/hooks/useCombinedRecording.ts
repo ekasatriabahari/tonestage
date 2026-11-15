@@ -232,10 +232,6 @@ export function useCombinedRecording(backing: BackingTrack) {
     transportBusy.current = true;
     setTransportPending(true);
     try {
-      if (audioActive.current && !(await resumeAudioCapture())) {
-        setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
-        return;
-      }
       const hasBacking = latest.current.loadedUri !== null && latest.current.loaded !== null;
       if (hasBacking && !(await latest.current.play())) {
         setMessage('Backing track gagal dilanjutkan. Rekaman masih dijeda.');
