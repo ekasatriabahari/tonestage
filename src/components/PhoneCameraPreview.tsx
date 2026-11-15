@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { type NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
+import { type NativeSyntheticEvent, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import CameraVideoView from '../../specs/CameraVideoViewNativeComponent';
 import {
   describeRecordingError,
@@ -28,6 +28,8 @@ export function PhoneCameraPreview({
   onRecordingEvent,
 }: Props) {
   const [video, setVideo] = useState<VideoState>({ kind: 'preparing' });
+  const { width, height } = useWindowDimensions();
+  const isPortrait = height >= width;
 
   useEffect(() => {
     setVideo({ kind: 'preparing' });
@@ -58,7 +60,7 @@ export function PhoneCameraPreview({
     setVideo(parsePlayerEvent(payload));
   }, [onRecordingEvent, onVideoReady]);
 
-  const ratio = previewAspectRatio(video);
+  const ratio = isPortrait ? 9 / 16 : 16 / 9;
   return (
     <View style={[styles.box, { aspectRatio: ratio }]}>
       <CameraVideoView
