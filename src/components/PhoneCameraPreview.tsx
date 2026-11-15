@@ -30,6 +30,11 @@ export function PhoneCameraPreview({
   const [video, setVideo] = useState<VideoState>({ kind: 'preparing' });
 
   useEffect(() => {
+    setVideo({ kind: 'preparing' });
+    onVideoReady?.(false);
+  }, [lensFacing]);
+
+  useEffect(() => {
     onVideoReady?.(video.kind === 'playing');
   }, [video.kind, onVideoReady]);
 
