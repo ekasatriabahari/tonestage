@@ -15,6 +15,8 @@ import org.json.JSONObject
 internal class AudioFileRecorder {
   @Volatile private var running = false
   @Volatile private var finalResult: JSONObject? = null
+  @Volatile private var paused = false
+  @Volatile private var activeRecord: AudioRecord? = null
   private var thread: Thread? = null
 
   /** Returns {ok, error, source, sampleRate, channels}. */
@@ -57,6 +59,8 @@ internal class AudioFileRecorder {
     }
 
     finalResult = null
+    paused = false
+    activeRecord = rec
     running = true
     val worker =
         Thread {
@@ -75,9 +79,38 @@ internal class AudioFileRecorder {
     return result
   }
 
+  /** Pause the input capture without closing the WAV writer. */
+  fun pause(): Boolean {
+    val rec = activeRecord ?: return false
+    if (!running || paused) return false
+    paused = true
+    return try {
+      rec.stop()
+      true
+    } catch (_: Exception) {
+      paused = false
+      false
+    }
+  }
+
+  /** Resume input capture; new samples append to the same WAV file. */
+  fun resume(): Boolean {
+    val rec = activeRecord ?: return false
+    if (!running || !paused) return false
+    return try {
+      rec.startRecording()
+      val ok = rec.recordingState == AudioRecord.RECORDSTATE_RECORDING
+      paused = !ok
+      ok
+    } catch (_: Exception) {
+      false
+    }
+  }
+
   /** Stops recording and returns the measured result. */
   fun stop(): JSONObject {
     running = false
+    paused = false
     val worker = thread
     thread = null
     if (worker != null) {
@@ -129,8 +162,13 @@ internal class AudioFileRecorder {
     var lastDataAt = System.nanoTime()
     try {
       while (running) {
+        if (paused) {
+          Thread.sleep(5)
+          continue
+        }
         val n = rec.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
         if (n < 0) {
+          if (paused) continue
           error = "READ_ERROR_$n"
           break
         }
@@ -189,6 +227,8 @@ internal class AudioFileRecorder {
         writer.close()
       } catch (ignored: Exception) {}
       running = false
+      paused = false
+      activeRecord = null
     }
 
     val ok = error.isEmpty() && stats.frames > 0 && timing != "none"
