@@ -124,14 +124,19 @@ export function describeRecordingError(code: string): string {
 export function summarizeRecording(s: RecordingStats): string[] {
   const lines: string[] = [];
   lines.push(`Resolusi: ${s.width}x${s.height}`);
+  if (s.source === 'yi-rtsp') lines.push('Sumber: Yi Action Cam (RTSP)');
+  else if (s.source === 'phone-front') lines.push('Sumber: kamera depan HP');
+  else if (s.source === 'phone-rear') lines.push('Sumber: kamera belakang HP');
   const mediaSec = s.mediaDurationMs / 1000;
   const wallSec = s.wallMs / 1000;
-  if (mediaSec > 0) {
+  if (s.frames > 0 && mediaSec > 0) {
     lines.push(
       `Frame: ${s.frames} (${s.keyFrames} keyframe), rata-rata ${(s.frames / mediaSec).toFixed(1)} fps`,
     );
-  } else {
+  } else if (s.frames > 0) {
     lines.push(`Frame: ${s.frames} (${s.keyFrames} keyframe)`);
+  } else {
+    lines.push('Jumlah frame: tidak dilaporkan oleh perekam kamera HP');
   }
   lines.push(
     `Durasi isi file: ${mediaSec.toFixed(2)} dtk | waktu nyata: ${wallSec.toFixed(2)} dtk | selisih: ${(mediaSec - wallSec).toFixed(2)} dtk`,
