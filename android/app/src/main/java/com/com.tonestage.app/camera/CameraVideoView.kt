@@ -16,6 +16,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
@@ -39,6 +40,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private var startedAtUs = 0L
   private var startedAtMs = 0L
   private var released = false
+  private var streamObserver: Observer<PreviewView.StreamState>? = null
 
   init {
     previewView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -75,7 +77,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       return
     }
     try {
-      cameraProvider.unbind(preview, videoCapture)
+      cameraProvider.unbind(*listOfNotNull(preview, videoCapture).toTypedArray())
       val nextPreview = Preview.Builder().build().also {
         it.setSurfaceProvider(previewView.surfaceProvider)
       }
@@ -87,6 +89,15 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       cameraProvider.bindToLifecycle(owner, selector, nextPreview, nextVideo)
       preview = nextPreview
       videoCapture = nextVideo
+      streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
+      val observer = Observer<PreviewView.StreamState> { state ->
+        if (state == PreviewView.StreamState.STREAMING) {
+          val size = nextVideo.resolutionInfo?.resolution
+          emit("playing", size?.width ?: 0, size?.height ?: 0, "")
+        }
+      }
+      streamObserver = observer
+      previewView.previewStreamState.observe(owner, observer)
       val w = nextVideo.resolutionInfo?.resolution?.width ?: 1280
       val h = nextVideo.resolutionInfo?.resolution?.height ?: 720
       emit("preparing", w, h, "")
@@ -192,7 +203,9 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   fun release() {
     released = true
     stopRecording()
-    try { provider?.unbind(preview, videoCapture) } catch (_: Exception) {}
+    streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
+    streamObserver = null
+    try { provider?.unbind(*listOfNotNull(preview, videoCapture).toTypedArray()) } catch (_: Exception) {}
     provider = null
     preview = null
     videoCapture = null
