@@ -202,27 +202,38 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val viewHeight = previewTexture.height.toFloat()
     if (viewWidth <= 0f || viewHeight <= 0f || !previewTexture.isAvailable) return
 
-    val bufferWidth = previewTexture.surfaceTexture?.let { preview ->
-      // SurfaceTexture buffer size is the CameraX output resolution.
-      previewCropRect?.width()?.takeIf { it > 0f } ?: viewWidth
-    } ?: return
-    val bufferHeight = previewCropRect?.height()?.takeIf { it > 0f } ?: viewHeight
-    val crop = previewCropRect ?: RectF(0f, 0f, bufferWidth, bufferHeight)
-    val matrix = Matrix()
-    // CameraX rotationDegrees is the clockwise rotation required to bring
-    // the delivered camera buffer into the target display orientation.
-    // TextureView does not apply this automatically for a custom SurfaceProvider.
-    matrix.setRotate(previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
+    val crop = previewCropRect ?: return
+    if (crop.width() <= 0f || crop.height() <= 0f) return
 
-    val rotatedCrop = RectF(crop)
-    matrix.mapRect(rotatedCrop)
-    val scale = maxOf(viewWidth / rotatedCrop.width(), viewHeight / rotatedCrop.height())
-    matrix.postScale(scale, scale)
-    matrix.postTranslate(
-      viewWidth / 2f - rotatedCrop.centerX() * scale,
-      viewHeight / 2f - rotatedCrop.centerY() * scale
-    )
-    previewTexture.setTransform(matrix)
+    // Rotate the camera buffer around the crop center first.
+    val rotate = Matrix().apply {
+      setRotate(previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
+    }
+    val rotatedBounds = RectF(crop)
+    rotate.mapRect(rotatedBounds)
+    if (rotatedBounds.width() <= 0f || rotatedBounds.height() <= 0f) return
+
+    // Center-crop the rotated buffer into the TextureView bounds.
+    val scale = maxOf(viewWidth / rotatedBounds.width(), viewHeight / rotatedBounds.height())
+    val translateX = viewWidth / 2f - rotatedBounds.centerX() * scale
+    val translateY = viewHeight / 2f - rotatedBounds.centerY() * scale
+    val fit = Matrix().apply {
+      setValues(floatArrayOf(
+        scale, 0f, translateX,
+        0f, scale, translateY,
+        0f, 0f, 1f
+      ))
+    }
+
+    // Final mapping: source buffer -> rotation -> center-crop view mapping.
+    val transform = Matrix()
+    transform.setConcat(fit, rotate)
+    previewTexture.setTransform(transform)
+
+    Log.d(TAG, "applied preview matrix rotation=" + previewRotationDegrees +
+      " buffer=" + crop.width() + "x" + crop.height() +
+      " rotated=" + rotatedBounds.width() + "x" + rotatedBounds.height() +
+      " view=" + viewWidth + "x" + viewHeight + " scale=" + scale)
   }
 
   /** Provide CameraX a Surface backed directly by TextureView. */
