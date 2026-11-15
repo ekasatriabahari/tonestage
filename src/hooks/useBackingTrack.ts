@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type MeterState, nextMeterState, resetClipping } from '../native/audioMeter';
 import {
+  beginBackingRecordingPause,
+  endBackingRecordingPause,
   lastBackingFile,
   listBackingOutputs,
   loadBackingTrack,
@@ -199,6 +201,14 @@ export function useBackingTrack(active: boolean) {
     await stopBacking();
   }, []);
 
+  const markRecordingPause = useCallback(async () => {
+    await beginBackingRecordingPause();
+  }, []);
+
+  const markRecordingResume = useCallback(async () => {
+    await endBackingRecordingPause();
+  }, []);
+
   const seekTo = useCallback(async (positionMs: number) => {
     await seekBacking(positionMs);
   }, []);
@@ -259,6 +269,8 @@ export function useBackingTrack(active: boolean) {
     play,
     pause,
     stop,
+    markRecordingPause,
+    markRecordingResume,
     seekTo,
     seekBy,
     setVolume,
