@@ -10,6 +10,7 @@ import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
+import androidx.camera.video.MirrorMode
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
@@ -85,7 +86,9 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       val recorder = Recorder.Builder()
         .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
         .build()
-      val nextVideo = VideoCapture.withOutput(recorder)
+      val nextVideo = VideoCapture.Builder(recorder)
+        .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
+        .build()
       val selector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
       cameraProvider.bindToLifecycle(owner, selector, nextPreview, nextVideo)
       preview = nextPreview
