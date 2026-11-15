@@ -251,6 +251,7 @@ internal class StreamRecorder {
     json.put("csdFromFormat", csdFromFormat)
     // On the same clock as the audio recorder (System.nanoTime), so the two can be aligned.
     json.put("firstSampleUs", firstSampleNs / 1000)
+    json.put("source", "yi-rtsp")
     state = State.IDLE
     paused = false
     file = null
