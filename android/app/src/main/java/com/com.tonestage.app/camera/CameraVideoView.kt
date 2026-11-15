@@ -97,9 +97,11 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       videoCapture = nextVideo
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
       val observer = Observer<PreviewView.StreamState> { state ->
+        val size = nextVideo.resolutionInfo?.resolution
         if (state == PreviewView.StreamState.STREAMING) {
-          val size = nextVideo.resolutionInfo?.resolution
           emit("playing", size?.width ?: 0, size?.height ?: 0, "")
+        } else {
+          emit("preparing", size?.width ?: 0, size?.height ?: 0, "")
         }
       }
       streamObserver = observer
