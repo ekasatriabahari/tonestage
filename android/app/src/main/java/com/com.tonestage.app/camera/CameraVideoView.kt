@@ -6,6 +6,7 @@ import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -77,12 +78,12 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       return
     }
     try {
-      cameraProvider.unbind(*listOfNotNull(preview, videoCapture).toTypedArray())
+      cameraProvider.unbindAll()
       val nextPreview = Preview.Builder().build().also {
         it.setSurfaceProvider(previewView.surfaceProvider)
       }
       val recorder = Recorder.Builder()
-        .setQualitySelector(QualitySelector.from(Quality.HD))
+        .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
         .build()
       val nextVideo = VideoCapture.withOutput(recorder)
       val selector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
@@ -206,7 +207,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     stopRecording()
     streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
     streamObserver = null
-    try { provider?.unbind(*listOfNotNull(preview, videoCapture).toTypedArray()) } catch (_: Exception) {}
+    try { provider?.unbindAll() } catch (_: Exception) {}
     provider = null
     preview = null
     videoCapture = null
