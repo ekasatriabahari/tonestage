@@ -230,6 +230,14 @@ class AudioInputModule(reactContext: ReactApplicationContext) : NativeAudioInput
     }
   }
 
+  override fun pauseAudioCapture(promise: Promise) {
+    executor.execute { promise.resolve(fileRecorder.pause()) }
+  }
+
+  override fun resumeAudioCapture(promise: Promise) {
+    executor.execute { promise.resolve(fileRecorder.resume()) }
+  }
+
   override fun stopAudioCapture(promise: Promise) {
     executor.execute {
       try {
