@@ -32,16 +32,14 @@ export function PhoneCameraPreview({
   useEffect(() => {
     setVideo({ kind: 'preparing' });
     onVideoReady?.(false);
-  }, [lensFacing]);
-
-  useEffect(() => {
-    onVideoReady?.(video.kind === 'playing');
-  }, [video.kind, onVideoReady]);
+  }, [lensFacing, onVideoReady]);
 
   useEffect(() => () => onVideoReady?.(false), [onVideoReady]);
 
   const onPlayerState = useCallback((event: NativeSyntheticEvent<PlayerStatePayload>) => {
     const payload = event.nativeEvent;
+    if (payload.state === 'playing') onVideoReady?.(true);
+    else if (payload.state === 'error' || payload.state === 'preparing') onVideoReady?.(false);
     if (payload.state === 'recording') {
       onRecordingEvent?.({ kind: 'started' });
       return;
@@ -58,7 +56,7 @@ export function PhoneCameraPreview({
       return;
     }
     setVideo(parsePlayerEvent(payload));
-  }, [onRecordingEvent]);
+  }, [onRecordingEvent, onVideoReady]);
 
   const ratio = previewAspectRatio(video);
   return (
