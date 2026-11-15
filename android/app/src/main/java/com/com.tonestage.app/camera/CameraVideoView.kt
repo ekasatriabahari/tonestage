@@ -5,7 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.util.Log
 import android.view.OrientationEventListener
 import android.view.Surface
-import android.view.SurfaceTexture
+import android.graphics.SurfaceTexture
 import android.view.TextureView
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
