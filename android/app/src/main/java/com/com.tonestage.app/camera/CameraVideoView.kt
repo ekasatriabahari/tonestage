@@ -100,7 +100,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     bindCamera()
   }
 
-  private fun bindCamera() {
+  private fun bindCamera(includeVideoCapture: Boolean = false) {
     val cameraProvider = provider ?: return
     val owner = (context as? com.facebook.react.uimanager.ThemedReactContext)?.currentActivity as? LifecycleOwner
     if (owner == null) {
@@ -120,15 +120,24 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also {
         it.setSurfaceProvider(previewView.surfaceProvider)
       }
-      val recorder = Recorder.Builder()
-        .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
-        .build()
-      val nextVideo = VideoCapture.Builder(recorder)
-        .setTargetRotation(rotation)
-        .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
-        .build()
+      // Keep preview lightweight while idle. Some devices (notably certain MIUI
+      // camera stacks) time out configuring Preview + VideoCapture together,
+      // even though Preview alone works. Attach the encoder only when recording.
+      val nextVideo = if (includeVideoCapture) {
+        val recorder = Recorder.Builder()
+          .setQualitySelector(QualitySelector.from(Quality.SD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
+          .build()
+        VideoCapture.Builder(recorder)
+          .setTargetRotation(rotation)
+          .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
+          .build()
+      } else null
       val selector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
-      cameraProvider.bindToLifecycle(owner, selector, nextPreview, nextVideo)
+      if (nextVideo != null) {
+        cameraProvider.bindToLifecycle(owner, selector, nextPreview, nextVideo)
+      } else {
+        cameraProvider.bindToLifecycle(owner, selector, nextPreview)
+      }
       cameraBound = true
       preview = nextPreview
       videoCapture = nextVideo
@@ -145,7 +154,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       streamObserver = observer
       emit("preparing", 1280, 720, "")
       previewView.previewStreamState.observe(owner, observer)
-      if (currentPath.isNotEmpty()) startRecording(currentPath)
+      if (includeVideoCapture && currentPath.isNotEmpty()) startRecording(currentPath)
     } catch (e: Exception) {
       cameraBound = false
       emit("error", 0, 0, e.javaClass.simpleName + ": " + (e.message ?: "CAMERA_BIND_FAILED"))
@@ -160,6 +169,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       stopRecording()
     } else if (videoCapture != null) {
       startRecording(next)
+    } else {
+      bindCamera(includeVideoCapture = true)
     }
   }
 
@@ -233,6 +244,11 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
             emit("recorded", width, height, json.toString())
             currentPath = ""
             paused = false
+            // Release the encoder use case after each take; leave a preview-only
+            // session running so preview remains available between recordings.
+            post {
+              if (!released && currentPath.isEmpty()) bindCamera(includeVideoCapture = false)
+            }
           }
         }
       }
