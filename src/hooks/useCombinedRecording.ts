@@ -29,6 +29,7 @@ export type RecPhase =
   | 'idle'
   | 'starting'
   | 'recording'
+  | 'paused'
   | 'stopping'
   | 'finished'
   | 'error';
@@ -51,6 +52,7 @@ export function useCombinedRecording(backing: BackingTrack) {
   const [videoReady, setVideoReady] = useState(false);
   const [phase, setPhase] = useState<RecPhase>('idle');
   const [videoRecordingPath, setVideoRecordingPath] = useState('');
+  const [videoRecordingPaused, setVideoRecordingPaused] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [audioChoice, setAudioChoice] = useState<AudioChoice | null>(null);
   const [since, setSince] = useState(0);
@@ -81,6 +83,7 @@ export function useCombinedRecording(backing: BackingTrack) {
 
   const reset = useCallback(() => {
     setMessage(null);
+    setVideoRecordingPaused(false);
     setVideoStats(null);
     setVideoFailed(false);
     setAudioResult(null);
@@ -116,6 +119,7 @@ export function useCombinedRecording(backing: BackingTrack) {
     reset();
     setPhase('starting');
     const fail = async (text: string) => {
+      await latest.current.stop();
       await finishAudio();
       await finishLog();
       const current = session.current;
@@ -179,6 +183,10 @@ export function useCombinedRecording(backing: BackingTrack) {
     };
     await startBackingLog();
     logActive.current = true;
+    if (b.loadedUri !== null && b.loaded !== null) {
+      await b.seekTo(0);
+      await b.play();
+    }
     const began = await beginAudioCapture(choice.id, created.audioPath);
     if (!began.ok) {
       await fail(began.message);
@@ -186,15 +194,32 @@ export function useCombinedRecording(backing: BackingTrack) {
     }
     audioActive.current = true;
     setAudioChoice(choice);
+    setVideoRecordingPaused(false);
     setVideoRecordingPath(created.videoPath);
   }, [reset, finishAudio, finishLog]);
 
+  const pause = useCallback(async () => {
+    if (phase !== 'recording') return;
+    setVideoRecordingPaused(true);
+    setPhase('paused');
+    await latest.current.pause();
+  }, [phase]);
+
+  const resume = useCallback(async () => {
+    if (phase !== 'paused') return;
+    await latest.current.play();
+    setVideoRecordingPaused(false);
+    setPhase('recording');
+  }, [phase]);
+
   const stop = useCallback(async () => {
-    if (phase !== 'starting' && phase !== 'recording') {
+    if (phase !== 'starting' && phase !== 'recording' && phase !== 'paused') {
       return;
     }
     setPhase('stopping');
+    setVideoRecordingPaused(false);
     setVideoRecordingPath(''); // the preview then reports the video result
+    await latest.current.stop();
     await finishAudio();
     await finishLog();
   }, [phase, finishAudio, finishLog]);
@@ -286,11 +311,14 @@ export function useCombinedRecording(backing: BackingTrack) {
       if (
         phase !== 'starting' &&
         phase !== 'recording' &&
+        phase !== 'paused' &&
         phase !== 'stopping'
       ) {
         return;
       }
       setVideoRecordingPath('');
+      setVideoRecordingPaused(false);
+      await latest.current.stop();
       await finishAudio();
       await finishLog();
       setMessage(reason);
@@ -318,6 +346,7 @@ export function useCombinedRecording(backing: BackingTrack) {
     setVideoReady,
     phase,
     videoRecordingPath,
+    videoRecordingPaused,
     message,
     audioChoice,
     since,
@@ -327,6 +356,8 @@ export function useCombinedRecording(backing: BackingTrack) {
     savedId,
     storage,
     start,
+    pause,
+    resume,
     stop,
     onVideoEvent,
     abort,
