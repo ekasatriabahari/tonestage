@@ -28,6 +28,7 @@ internal class StreamRecorder {
   private var state = State.IDLE
   @Volatile private var paused = false
   private var lastObservedTimeUs = 0L
+  private var lastFrameIntervalUs = 33_333L
   private var pauseStartTimeUs = 0L
   private var pausedDurationUs = 0L
   private var resumePending = false
@@ -98,6 +99,7 @@ internal class StreamRecorder {
     csdFromFormat = false
     paused = false
     lastObservedTimeUs = 0L
+    lastFrameIntervalUs = 33_333L
     pauseStartTimeUs = 0L
     pausedDurationUs = 0L
     resumePending = false
@@ -110,11 +112,16 @@ internal class StreamRecorder {
     if (state != State.WAITING_KEYFRAME && state != State.RUNNING) {
       return
     }
+    val previousObservedUs = lastObservedTimeUs
+    if (previousObservedUs > 0L && timeUs > previousObservedUs) {
+      val interval = timeUs - previousObservedUs
+      if (interval in 1L..100_000L) lastFrameIntervalUs = interval
+    }
     lastObservedTimeUs = timeUs
     if (paused) return
     if (resumePending) {
       if (pauseStartTimeUs > 0L && timeUs > pauseStartTimeUs) {
-        pausedDurationUs += timeUs - pauseStartTimeUs
+        pausedDurationUs += (timeUs - pauseStartTimeUs - lastFrameIntervalUs).coerceAtLeast(0L)
       }
       pauseStartTimeUs = 0L
       resumePending = false
