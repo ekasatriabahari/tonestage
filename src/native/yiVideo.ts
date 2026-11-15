@@ -147,17 +147,21 @@ export function summarizeRecording(s: RecordingStats): string[] {
       ? `Ukuran video: ${kb} KB (rata-rata ${Math.round((s.bytes * 8) / mediaSec / 1000)} kbps)`
       : `Ukuran video: ${kb} KB`,
   );
-  lines.push(`Menunggu keyframe pertama: ${s.waitedForKeyframeMs} ms`);
-  if (s.skippedBeforeStart > 0) {
-    lines.push(`Frame dilewati sebelum keyframe pertama: ${s.skippedBeforeStart}`);
+  if (s.source === 'phone-front' || s.source === 'phone-rear') {
+    lines.push('Encoder: CameraX / Android');
+  } else {
+    lines.push(`Menunggu keyframe pertama: ${s.waitedForKeyframeMs} ms`);
+    if (s.skippedBeforeStart > 0) {
+      lines.push(`Frame dilewati sebelum keyframe pertama: ${s.skippedBeforeStart}`);
+    }
+    if (s.nonMonotonic > 0) {
+      lines.push(`Timestamp mundur yang dikoreksi: ${s.nonMonotonic} kali`);
+    }
+    lines.push(
+      s.csdFromFormat
+        ? 'Parameter video (SPS/PPS) dilengkapi dari data SDP kamera.'
+        : 'Parameter video (SPS/PPS) ditemukan di dalam aliran video.',
+    );
   }
-  if (s.nonMonotonic > 0) {
-    lines.push(`Timestamp mundur yang dikoreksi: ${s.nonMonotonic} kali`);
-  }
-  lines.push(
-    s.csdFromFormat
-      ? 'Parameter video (SPS/PPS) dilengkapi dari data SDP kamera.'
-      : 'Parameter video (SPS/PPS) ditemukan di dalam aliran video.',
-  );
   return lines;
 }
