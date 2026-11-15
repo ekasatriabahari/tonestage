@@ -209,8 +209,13 @@ export function useCombinedRecording(backing: BackingTrack) {
         setMessage('Input gitar gagal dijeda. Rekaman tetap berjalan.');
         return;
       }
+      const hasBacking = latest.current.loadedUri !== null && latest.current.loaded !== null;
+      if (hasBacking && !(await latest.current.pause())) {
+        if (audioActive.current) await resumeAudioCapture();
+        setMessage('Backing track gagal dijeda. Rekaman tetap berjalan.');
+        return;
+      }
       await latest.current.markRecordingPause();
-      await latest.current.pause();
       setVideoRecordingPaused(true);
       setPhase('paused');
     } finally {
@@ -228,10 +233,17 @@ export function useCombinedRecording(backing: BackingTrack) {
         setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
         return;
       }
-      await latest.current.markRecordingResume();
-      if (latest.current.loadedUri !== null && latest.current.loaded !== null) {
-        await latest.current.play();
+      const hasBacking = latest.current.loadedUri !== null && latest.current.loaded !== null;
+      if (hasBacking && !(await latest.current.play())) {
+        setMessage('Backing track gagal dilanjutkan. Rekaman masih dijeda.');
+        return;
       }
+      if (audioActive.current && !(await resumeAudioCapture())) {
+        if (hasBacking) await latest.current.pause();
+        setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
+        return;
+      }
+      await latest.current.markRecordingResume();
       setVideoRecordingPaused(false);
       setPhase('recording');
     } finally {
