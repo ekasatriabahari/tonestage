@@ -4,13 +4,13 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
-import androidx.camera.video.MirrorMode
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
