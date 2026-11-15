@@ -132,6 +132,8 @@ export async function listBackingOutputs(): Promise<OutputDevice[] | null> {
 }
 
 export const startBackingLog = () => call(m => m.startEventLog());
+export const beginBackingRecordingPause = () => call(m => m.beginRecordingPause());
+export const endBackingRecordingPause = () => call(m => m.endRecordingPause());
 
 /** The playback runs logged since startBackingLog; null when they cannot be read. */
 export async function stopBackingLog(): Promise<BackingLog | null> {
