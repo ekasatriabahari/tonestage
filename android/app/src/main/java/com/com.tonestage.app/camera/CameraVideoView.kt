@@ -123,18 +123,17 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       preview = nextPreview
       videoCapture = nextVideo
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
+      // Report the requested HD target while previewing; final dimensions are
+      // read from the finalized MP4 metadata below.
       val observer = Observer<PreviewView.StreamState> { state ->
-        val size = null
         if (state == PreviewView.StreamState.STREAMING) {
-          emit("playing", size?.width ?: 0, size?.height ?: 0, "")
+          emit("playing", 1280, 720, "")
         } else {
-          emit("preparing", size?.width ?: 0, size?.height ?: 0, "")
+          emit("preparing", 1280, 720, "")
         }
       }
       streamObserver = observer
-      val w = null?.width ?: 1280
-      val h = null?.height ?: 720
-      emit("preparing", w, h, "")
+      emit("preparing", 1280, 720, "")
       previewView.previewStreamState.observe(owner, observer)
       if (currentPath.isNotEmpty()) startRecording(currentPath)
     } catch (e: Exception) {
