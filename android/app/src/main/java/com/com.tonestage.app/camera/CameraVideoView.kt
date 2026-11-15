@@ -70,7 +70,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     future.addListener({
       if (released) return@addListener
       provider = future.get()
-      if (isAttachedToWindow) bindCamera()
+      if (isAttachedToWindow) bindCamera(includeVideoCapture = currentPath.isNotEmpty())
     }, mainExecutor)
   }
 
@@ -78,7 +78,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     super.onAttachedToWindow()
     orientationListener.enable()
     // The React Activity/lifecycle owner may not be available during view construction.
-    if (!cameraBound && provider != null) post { bindCamera() }
+    if (!cameraBound && provider != null) post { bindCamera(includeVideoCapture = currentPath.isNotEmpty()) }
   }
 
   override fun onDetachedFromWindow() {
