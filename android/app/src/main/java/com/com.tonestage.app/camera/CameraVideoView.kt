@@ -37,6 +37,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
   private var pendingSurfaceRequest: androidx.camera.core.SurfaceRequest? = null
   private var activePreviewSurface: Surface? = null
+  private var previewFrameReceived = false
   private val orientationListener = object : OrientationEventListener(context) {
     override fun onOrientationChanged(orientation: Int) {
       if (orientation == ORIENTATION_UNKNOWN) return
@@ -81,7 +82,13 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
         activePreviewSurface = null
         return true
       }
-      override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
+      override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
+        if (!previewFrameReceived) {
+          previewFrameReceived = true
+          Log.d(TAG, "TextureView first preview frame received")
+          emit("playing", 1280, 720, "")
+        }
+      }
     }
     addView(previewTexture)
     addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
@@ -195,6 +202,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val resolution = request.resolution
     try {
       texture.setDefaultBufferSize(resolution.width, resolution.height)
+      previewFrameReceived = false
       val surface = Surface(texture)
       activePreviewSurface = surface
       Log.d(TAG, "provideSurface resolution=${resolution.width}x${resolution.height}")
@@ -202,9 +210,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
         Log.d(TAG, "provideSurface result=${result.resultCode}")
         if (activePreviewSurface === surface) activePreviewSurface = null
         surface.release()
-        if (result.resultCode == androidx.camera.core.SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY) {
-          emit("playing", 1280, 720, "")
-        } else if (!released) {
+        if (result.resultCode != androidx.camera.core.SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY && !released) {
           emit("preparing", 1280, 720, "PREVIEW_SURFACE_RESULT_${result.resultCode}")
         }
       }
