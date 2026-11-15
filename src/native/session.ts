@@ -10,7 +10,7 @@ export type SessionManifest = {
   title?: string;
   id: string;
   createdMs: number;
-  video: { path: string; firstSampleUs: number; mediaDurationMs: number; frames: number; width: number; height: number };
+  video: { path: string; firstSampleUs: number; mediaDurationMs: number; frames: number; width: number; height: number; source?: string };
   guitar: null | {
     path: string;
     startUs: number;
@@ -51,6 +51,7 @@ export function buildManifest(args: {
       frames: video.frames,
       width: video.width,
       height: video.height,
+      source: video.source,
     },
     guitar:
       audio === null
