@@ -166,7 +166,7 @@ internal class BackingTrackEngine(private val context: Context) {
       }
       when (state) {
         State.PAUSED -> wantPaused = false
-        State.PLAYING -> {}
+        State.PLAYING -> wantPaused = false
         else -> startWorker(startAtUs)
       }
     }
