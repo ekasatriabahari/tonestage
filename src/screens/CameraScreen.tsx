@@ -25,7 +25,7 @@ import {
   validateRtspUrl,
 } from '../utils/rstpUrl';
 
-type CameraSource = 'yi' | 'front' | 'rear';
+type CameraSource = 'yi' | 'front' | 'back';
 type StatusView = { color: string; text: string; detail?: string };
 
 function describeState(state: YiState): StatusView {
@@ -101,7 +101,7 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
   const sourceOptions: { id: CameraSource; label: string }[] = [
     { id: 'yi', label: 'Yi Action Cam' },
     { id: 'front', label: 'Front Camera' },
-    { id: 'rear', label: 'Rear Camera' },
+    { id: 'back', label: 'Rear Camera' },
   ];
 
   return (
