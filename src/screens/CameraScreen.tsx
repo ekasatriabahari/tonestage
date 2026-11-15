@@ -55,7 +55,6 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
   const [cameraPermissionMessage, setCameraPermissionMessage] = useState<string | null>(null);
   const { state, activate, deactivate } = useYiActivation();
   const rec = useCombinedRecording(backing);
-  const cameraActive = state.kind === 'active';
   const recordingLocked = ['starting', 'recording', 'paused', 'stopping'].includes(rec.phase);
 
   useEffect(() => {
