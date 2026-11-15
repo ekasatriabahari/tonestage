@@ -28,7 +28,6 @@ export function RecordingPanel({ rec }: Props) {
 
   const idleLike = rec.phase === 'idle' || rec.phase === 'finished' || rec.phase === 'error';
   const canPress = idleLike ? rec.videoReady : rec.phase !== 'stopping';
-  const active = rec.phase === 'starting' || rec.phase === 'recording' || rec.phase === 'paused';
   const label =
     rec.phase === 'recording'
       ? `Berhenti rekam (${clock(now - rec.since)})`
