@@ -15,6 +15,7 @@ export interface NativeProps extends ViewProps {
   source?: string;
   /** Saves the incoming stream to this MP4 (inside the sessions folder); an empty string stops and reports the result. */
   recordingPath?: string;
+  recordingPaused?: boolean;
   onPlayerState?: CodegenTypes.BubblingEventHandler<PlayerStateEvent> | null;
 }
 
