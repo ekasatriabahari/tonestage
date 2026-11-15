@@ -2,6 +2,7 @@ package com.tonestage.app.camera
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.util.Log
 import android.view.OrientationEventListener
 import android.view.Surface
 import android.widget.FrameLayout
@@ -68,6 +69,12 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     // to time out even with Preview as the only use case.
     previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
     addView(previewView)
+    addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+      Log.d(TAG, "container layout=${right - left}x${bottom - top} attached=$isAttachedToWindow laidOut=$isLaidOut")
+    }
+    previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+      Log.d(TAG, "PreviewView layout=${right - left}x${bottom - top} attached=${previewView.isAttachedToWindow} laidOut=${previewView.isLaidOut} displayRotation=${previewView.display?.rotation}")
+    }
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({
       if (released) return@addListener
@@ -78,6 +85,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
+    Log.d(TAG, "onAttached width=$width height=$height preview=${previewView.width}x${previewView.height} laidOut=$isLaidOut")
     orientationListener.enable()
     // The React Activity/lifecycle owner may not be available during view construction.
     if (!cameraBound && provider != null) post { bindCamera(includeVideoCapture = currentPath.isNotEmpty()) }
@@ -114,13 +122,18 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       return
     }
     try {
+      Log.d(TAG, "bindCamera start lens=$currentLensFacing includeVideoCapture=$includeVideoCapture container=${width}x$height preview=${previewView.width}x${previewView.height} attached=$isAttachedToWindow laidOut=$isLaidOut")
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
       streamObserver = null
       cameraProvider.unbindAll()
       cameraBound = false
       val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
-      val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also {
-        it.setSurfaceProvider(previewView.surfaceProvider)
+      val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also { useCase ->
+        val previewSurfaceProvider = previewView.surfaceProvider
+        useCase.setSurfaceProvider(mainExecutor) { request ->
+          Log.d(TAG, "SurfaceProvider request resolution=${request.resolution} container=${width}x$height preview=${previewView.width}x${previewView.height} attached=${previewView.isAttachedToWindow} laidOut=${previewView.isLaidOut}")
+          previewSurfaceProvider.onSurfaceRequested(request)
+        }
       }
       // Keep preview lightweight while idle. Some devices (notably certain MIUI
       // camera stacks) time out configuring Preview + VideoCapture together,
@@ -147,6 +160,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       // Report the requested HD target while previewing; final dimensions are
       // read from the finalized MP4 metadata below.
       val observer = Observer<PreviewView.StreamState> { state ->
+        Log.d(TAG, "Preview streamState=$state container=${width}x$height preview=${previewView.width}x${previewView.height}")
         if (state == PreviewView.StreamState.STREAMING) {
           emit("playing", 1280, 720, "")
         } else {
@@ -158,6 +172,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       previewView.previewStreamState.observe(owner, observer)
       if (includeVideoCapture && currentPath.isNotEmpty()) startRecording(currentPath)
     } catch (e: Exception) {
+      Log.e(TAG, "bindCamera failed", e)
       cameraBound = false
       emit("error", 0, 0, e.javaClass.simpleName + ": " + (e.message ?: "CAMERA_BIND_FAILED"))
     }
