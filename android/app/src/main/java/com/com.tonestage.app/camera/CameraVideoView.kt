@@ -79,6 +79,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       return
     }
     try {
+      streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
+      streamObserver = null
       cameraProvider.unbindAll()
       val nextPreview = Preview.Builder().build().also {
         it.setSurfaceProvider(previewView.surfaceProvider)
@@ -101,10 +103,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
         }
       }
       streamObserver = observer
-      previewView.previewStreamState.observe(owner, observer)
       val w = nextVideo.resolutionInfo?.resolution?.width ?: 1280
       val h = nextVideo.resolutionInfo?.resolution?.height ?: 720
       emit("preparing", w, h, "")
+      previewView.previewStreamState.observe(owner, observer)
       if (currentPath.isNotEmpty()) startRecording(currentPath)
     } catch (e: Exception) {
       emit("error", 0, 0, e.javaClass.simpleName + ": " + (e.message ?: "CAMERA_BIND_FAILED"))
