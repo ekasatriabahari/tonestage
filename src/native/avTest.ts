@@ -71,6 +71,16 @@ export async function endAudioCapture(): Promise<
   }
 }
 
+export async function pauseAudioCapture(): Promise<boolean> {
+  if (NativeAudioInput == null) return false;
+  try { return await NativeAudioInput.pauseAudioCapture(); } catch { return false; }
+}
+
+export async function resumeAudioCapture(): Promise<boolean> {
+  if (NativeAudioInput == null) return false;
+  try { return await NativeAudioInput.resumeAudioCapture(); } catch { return false; }
+}
+
 export async function mergeAv(
   videoPath: string,
   audioPath: string,
