@@ -37,12 +37,12 @@ export function RecordingPanel({ rec }: Props) {
         ? 'Rekaman dijeda'
         : rec.phase === 'stopping'
           ? 'Menyimpan sesi...'
-          : 'Rekam sesi (video + gitar)';
+          : 'Rekam sesi (video + gitar + backing)';
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.help}>
-        Sumber gitar: perangkat USB bila ada; jika tidak, mikrofon ponsel (hanya untuk uji).
+        Sumber gitar: perangkat USB bila ada; jika tidak, mikrofon ponsel (hanya untuk uji). Backing track yang sudah dimuat akan mulai otomatis dan mengikuti pause/resume rekaman.
         {rec.audioChoice !== null ? ` Dipakai: ${rec.audioChoice.name}${rec.audioChoice.isUsb ? ' (USB)' : ' (mikrofon ponsel)'}.` : ''}
       </Text>
       {rec.storage !== null ? (
