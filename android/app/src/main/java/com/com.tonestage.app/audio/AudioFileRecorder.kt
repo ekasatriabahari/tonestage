@@ -176,15 +176,15 @@ internal class AudioFileRecorder {
         if (usable > 0) {
           val nowNs = System.nanoTime()
           lastDataAt = nowNs
-          if (timing != "timestamp" || nowNs - lastPollNs > 500_000_000L) {
+          if (!captureStartSet || nowNs - lastPollNs > 500_000_000L) {
             lastPollNs = nowNs
             val status = rec.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC)
             if (status == AudioRecord.SUCCESS) {
               if (!captureStartSet) {
                 captureStartNs = timestamp.nanoTime - timestamp.framePosition * 1_000_000_000L / sampleRate
                 captureStartSet = true
+                timing = "timestamp"
               }
-              timing = "timestamp"
               if (!haveStamp) {
                 firstStampNs = timestamp.nanoTime
                 firstStampFrames = timestamp.framePosition
