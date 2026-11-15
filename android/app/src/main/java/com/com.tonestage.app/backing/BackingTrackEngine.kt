@@ -66,6 +66,8 @@ internal class BackingTrackEngine(private val context: Context) {
   private var playingAtLogStart = false
   private var currentRun: RunRecord? = null
   private val finishedRuns = ArrayList<RunRecord>()
+  private val pausedLogIntervals = ArrayList<Pair<Long, Long>>()
+  private var logPauseStartUs = 0L
   @Volatile private var requestedDevice: AudioDeviceInfo? = null
   @Volatile private var stopFlag = false
   @Volatile private var wantPaused = false
@@ -225,6 +227,8 @@ internal class BackingTrackEngine(private val context: Context) {
   fun startEventLog() {
     synchronized(logLock) {
       finishedRuns.clear()
+      pausedLogIntervals.clear()
+      logPauseStartUs = 0L
       currentRun = null
       runOpen = false
       logStartUs = System.nanoTime() / 1000
@@ -243,10 +247,25 @@ internal class BackingTrackEngine(private val context: Context) {
     val runs = org.json.JSONArray()
     synchronized(logLock) {
       val now = System.nanoTime() / 1000
+      if (logPauseStartUs > 0L) {
+        pausedLogIntervals.add(logPauseStartUs to now)
+        logPauseStartUs = 0L
+      }
       endRunLocked(now)
+      fun compressedTime(timeUs: Long): Long {
+        var removed = 0L
+        for ((pauseStart, pauseEnd) in pausedLogIntervals) {
+          removed += when {
+            timeUs >= pauseEnd -> pauseEnd - pauseStart
+            timeUs > pauseStart -> timeUs - pauseStart
+            else -> 0L
+          }
+        }
+        return timeUs - removed
+      }
       logging = false
-      json.put("logStartUs", logStartUs)
-      json.put("logEndUs", now)
+      json.put("logStartUs", compressedTime(logStartUs))
+      json.put("logEndUs", compressedTime(now))
       for (run in finishedRuns) {
         // How much file time passes per second of system time (parts per million away from 1.0).
         val span = run.lastAnchorNanoUs - run.anchorNanoUs0
@@ -254,9 +273,9 @@ internal class BackingTrackEngine(private val context: Context) {
             if (span >= 2_000_000L) ((run.lastAnchorFileUs - run.anchorFileUs0).toDouble() / span - 1.0) * 1e6 else 0.0
         runs.put(
             JSONObject()
-                .put("startNanoUs", run.startNanoUs)
+                .put("startNanoUs", compressedTime(run.startNanoUs))
                 .put("startFileUs", run.startFileUs)
-                .put("endNanoUs", run.endNanoUs)
+                .put("endNanoUs", compressedTime(run.endNanoUs))
                 .put("slopePpm", slopePpm)
                 .put("anchorSpanMs", span / 1000)
         )
@@ -431,13 +450,23 @@ internal class BackingTrackEngine(private val context: Context) {
         }
         if (wantPaused) {
           session.pauseTrack()
-          endRunIfOpen(System.nanoTime() / 1000)
+          val pauseAtUs = System.nanoTime() / 1000
+          endRunIfOpen(pauseAtUs)
+          synchronized(logLock) {
+            if (logging && logPauseStartUs == 0L) logPauseStartUs = pauseAtUs
+          }
           state = State.PAUSED
           Thread.sleep(20)
           continue
         }
         state = State.PLAYING
         session.ensurePlaying()
+        synchronized(logLock) {
+          if (logging && logPauseStartUs > 0L) {
+            pausedLogIntervals.add(logPauseStartUs to (System.nanoTime() / 1000))
+            logPauseStartUs = 0L
+          }
+        }
         if (logging) {
           session.logAnchor()
         }
