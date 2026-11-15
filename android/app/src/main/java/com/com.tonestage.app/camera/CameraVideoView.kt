@@ -124,7 +124,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       videoCapture = nextVideo
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
       val observer = Observer<PreviewView.StreamState> { state ->
-        val size = nextVideo.resolutionInfo?.resolution
+        val size = null
         if (state == PreviewView.StreamState.STREAMING) {
           emit("playing", size?.width ?: 0, size?.height ?: 0, "")
         } else {
@@ -132,8 +132,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
         }
       }
       streamObserver = observer
-      val w = nextVideo.resolutionInfo?.resolution?.width ?: 1280
-      val h = nextVideo.resolutionInfo?.resolution?.height ?: 720
+      val w = null?.width ?: 1280
+      val h = null?.height ?: 720
       emit("preparing", w, h, "")
       previewView.previewStreamState.observe(owner, observer)
       if (currentPath.isNotEmpty()) startRecording(currentPath)
@@ -183,7 +183,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
         when (event) {
           is VideoRecordEvent.Start -> {
             startedAtUs = System.nanoTime() / 1000L
-            emit("recording", capture.resolutionInfo?.resolution?.width ?: 0, capture.resolutionInfo?.resolution?.height ?: 0, "")
+            emit("recording", 1280, 720, "")
             if (paused) recording?.pause()
           }
           is VideoRecordEvent.Finalize -> {
@@ -192,8 +192,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
             val ok = !event.hasError() && target.exists() && target.length() > 0L
             if (!ok) target.delete()
             val retriever = MediaMetadataRetriever()
-            var width = capture.resolutionInfo?.resolution?.width ?: 0
-            var height = capture.resolutionInfo?.resolution?.height ?: 0
+            var width = 1280
+            var height = 720
             var durationMs = event.recordingStats.recordedDurationNanos / 1_000_000L
             try {
               retriever.setDataSource(target.absolutePath)
