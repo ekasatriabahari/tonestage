@@ -256,7 +256,6 @@ export function useCombinedRecording(backing: BackingTrack) {
       return;
     }
     setPhase('stopping');
-    setVideoRecordingPaused(false);
     setVideoRecordingPath(''); // the preview then reports the video result
     await latest.current.stop();
     await finishAudio();
@@ -356,7 +355,6 @@ export function useCombinedRecording(backing: BackingTrack) {
         return;
       }
       setVideoRecordingPath('');
-      setVideoRecordingPaused(false);
       await latest.current.stop();
       await finishAudio();
       await finishLog();
