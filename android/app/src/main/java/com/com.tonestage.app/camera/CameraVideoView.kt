@@ -238,6 +238,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
 
   fun release() {
     released = true
+    orientationListener.disable()
     stopRecording()
     streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
     streamObserver = null
