@@ -5,7 +5,7 @@ import {
   type AudioChoice,
   pickAudioInput,
 } from '../native/avRecording';
-import { beginAudioCapture, endAudioCapture } from '../native/avTest';
+import { beginAudioCapture, endAudioCapture, pauseAudioCapture, resumeAudioCapture } from '../native/avTest';
 import { type BackingLog } from '../native/backingTrackLogic';
 import { startBackingLog, stopBackingLog } from '../native/backingTrack';
 import {
@@ -200,13 +200,21 @@ export function useCombinedRecording(backing: BackingTrack) {
 
   const pause = useCallback(async () => {
     if (phase !== 'recording') return;
+    if (audioActive.current && !(await pauseAudioCapture())) {
+      setMessage('Input gitar gagal dijeda. Rekaman tetap berjalan.');
+      return;
+    }
+    await latest.current.pause();
     setVideoRecordingPaused(true);
     setPhase('paused');
-    await latest.current.pause();
   }, [phase]);
 
   const resume = useCallback(async () => {
     if (phase !== 'paused') return;
+    if (audioActive.current && !(await resumeAudioCapture())) {
+      setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
+      return;
+    }
     if (latest.current.loadedUri !== null && latest.current.loaded !== null) {
       await latest.current.play();
     }
