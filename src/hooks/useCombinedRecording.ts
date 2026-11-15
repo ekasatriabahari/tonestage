@@ -53,6 +53,8 @@ export function useCombinedRecording(backing: BackingTrack) {
   const [phase, setPhase] = useState<RecPhase>('idle');
   const [videoRecordingPath, setVideoRecordingPath] = useState('');
   const [videoRecordingPaused, setVideoRecordingPaused] = useState(false);
+  const [transportPending, setTransportPending] = useState(false);
+  const transportBusy = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const [audioChoice, setAudioChoice] = useState<AudioChoice | null>(null);
   const [since, setSince] = useState(0);
@@ -199,27 +201,41 @@ export function useCombinedRecording(backing: BackingTrack) {
   }, [reset, finishAudio, finishLog]);
 
   const pause = useCallback(async () => {
-    if (phase !== 'recording') return;
-    if (audioActive.current && !(await pauseAudioCapture())) {
-      setMessage('Input gitar gagal dijeda. Rekaman tetap berjalan.');
-      return;
+    if (phase !== 'recording' || transportBusy.current) return;
+    transportBusy.current = true;
+    setTransportPending(true);
+    try {
+      if (audioActive.current && !(await pauseAudioCapture())) {
+        setMessage('Input gitar gagal dijeda. Rekaman tetap berjalan.');
+        return;
+      }
+      await latest.current.pause();
+      setVideoRecordingPaused(true);
+      setPhase('paused');
+    } finally {
+      transportBusy.current = false;
+      setTransportPending(false);
     }
-    await latest.current.pause();
-    setVideoRecordingPaused(true);
-    setPhase('paused');
   }, [phase]);
 
   const resume = useCallback(async () => {
-    if (phase !== 'paused') return;
-    if (audioActive.current && !(await resumeAudioCapture())) {
-      setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
-      return;
+    if (phase !== 'paused' || transportBusy.current) return;
+    transportBusy.current = true;
+    setTransportPending(true);
+    try {
+      if (audioActive.current && !(await resumeAudioCapture())) {
+        setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
+        return;
+      }
+      if (latest.current.loadedUri !== null && latest.current.loaded !== null) {
+        await latest.current.play();
+      }
+      setVideoRecordingPaused(false);
+      setPhase('recording');
+    } finally {
+      transportBusy.current = false;
+      setTransportPending(false);
     }
-    if (latest.current.loadedUri !== null && latest.current.loaded !== null) {
-      await latest.current.play();
-    }
-    setVideoRecordingPaused(false);
-    setPhase('recording');
   }, [phase]);
 
   const stop = useCallback(async () => {
@@ -357,6 +373,7 @@ export function useCombinedRecording(backing: BackingTrack) {
     phase,
     videoRecordingPath,
     videoRecordingPaused,
+    transportPending,
     message,
     audioChoice,
     since,
