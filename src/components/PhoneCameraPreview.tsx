@@ -5,7 +5,6 @@ import {
   describeRecordingError,
   parsePlayerEvent,
   parseRecordingStats,
-  previewAspectRatio,
   type PlayerStatePayload,
   type RecordingEvent,
   type VideoState,
