@@ -209,6 +209,7 @@ export function useCombinedRecording(backing: BackingTrack) {
         setMessage('Input gitar gagal dijeda. Rekaman tetap berjalan.');
         return;
       }
+      await latest.current.markRecordingPause();
       await latest.current.pause();
       setVideoRecordingPaused(true);
       setPhase('paused');
@@ -227,6 +228,7 @@ export function useCombinedRecording(backing: BackingTrack) {
         setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
         return;
       }
+      await latest.current.markRecordingResume();
       if (latest.current.loadedUri !== null && latest.current.loaded !== null) {
         await latest.current.play();
       }
