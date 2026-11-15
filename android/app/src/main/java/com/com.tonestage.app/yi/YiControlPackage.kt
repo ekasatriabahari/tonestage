@@ -1,6 +1,7 @@
 package com.tonestage.app.yi
 
 import com.facebook.react.BaseReactPackage
+import com.tonestage.app.camera.CameraVideoViewManager
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
@@ -11,7 +12,7 @@ import com.facebook.react.uimanager.ViewManager
 class YiControlPackage : BaseReactPackage() {
 
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
-      listOf(YiVideoViewManager())
+      listOf(YiVideoViewManager(), CameraVideoViewManager())
 
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? =
       if (name == YiControlModule.NAME) {
