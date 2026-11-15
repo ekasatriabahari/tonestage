@@ -27,6 +27,10 @@ internal class StreamRecorder {
 
   private var state = State.IDLE
   @Volatile private var paused = false
+  private var lastObservedTimeUs = 0L
+  private var pauseStartTimeUs = 0L
+  private var pausedDurationUs = 0L
+  private var resumePending = false
   private var file: File? = null
   private var muxer: MediaMuxer? = null
   private var trackIndex = -1
@@ -93,14 +97,27 @@ internal class StreamRecorder {
     droppedBeforeStart = 0
     csdFromFormat = false
     paused = false
+    lastObservedTimeUs = 0L
+    pauseStartTimeUs = 0L
+    pausedDurationUs = 0L
+    resumePending = false
     state = State.WAITING_KEYFRAME
   }
 
   /** [data] is read without changing it. [timeUs] is the sample time from the stream. */
   @Synchronized
   fun onSample(data: ByteBuffer, timeUs: Long, flaggedKeyFrame: Boolean) {
-    if (paused || (state != State.WAITING_KEYFRAME && state != State.RUNNING)) {
+    if (state != State.WAITING_KEYFRAME && state != State.RUNNING) {
       return
+    }
+    lastObservedTimeUs = timeUs
+    if (paused) return
+    if (resumePending) {
+      if (pauseStartTimeUs > 0L && timeUs > pauseStartTimeUs) {
+        pausedDurationUs += timeUs - pauseStartTimeUs
+      }
+      pauseStartTimeUs = 0L
+      resumePending = false
     }
     val view = data.duplicate()
     view.position(0)
@@ -173,7 +190,7 @@ internal class StreamRecorder {
       onStarted?.invoke()
     }
 
-    var ptsUs = timeUs - firstTimeUs
+    var ptsUs = timeUs - firstTimeUs - pausedDurationUs
     if (ptsUs < lastPtsUs) {
       nonMonotonic++
       ptsUs = lastPtsUs
@@ -195,12 +212,18 @@ internal class StreamRecorder {
 
   @Synchronized
   fun pause() {
-    if (state == State.WAITING_KEYFRAME || state == State.RUNNING) paused = true
+    if (state == State.WAITING_KEYFRAME || state == State.RUNNING) {
+      if (!paused) pauseStartTimeUs = lastObservedTimeUs
+      paused = true
+    }
   }
 
   @Synchronized
   fun resume() {
-    if (state == State.WAITING_KEYFRAME || state == State.RUNNING) paused = false
+    if (state == State.WAITING_KEYFRAME || state == State.RUNNING) {
+      if (paused) resumePending = true
+      paused = false
+    }
   }
 
   /** Finishes the file. Returns the measured result, or null if no recording was started. */
@@ -254,6 +277,7 @@ internal class StreamRecorder {
     json.put("source", "yi-rtsp")
     state = State.IDLE
     paused = false
+    resumePending = false
     file = null
     return json
   }
