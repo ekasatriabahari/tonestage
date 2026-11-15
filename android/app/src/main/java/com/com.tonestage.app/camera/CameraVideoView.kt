@@ -58,22 +58,27 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private var startedAtMs = 0L
   private var released = false
   private var streamObserver: Observer<PreviewView.StreamState>? = null
+  private var cameraBound = false
 
   init {
     previewView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+    // TextureView-based rendering is more reliable inside React Native layouts.
+    previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
     addView(previewView)
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({
       if (released) return@addListener
       provider = future.get()
-      bindCamera()
+      if (isAttachedToWindow) bindCamera()
     }, mainExecutor)
   }
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     orientationListener.enable()
+    // The React Activity/lifecycle owner may not be available during view construction.
+    if (!cameraBound && provider != null) post { bindCamera() }
   }
 
   override fun onDetachedFromWindow() {
@@ -83,7 +88,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
 
   fun setLensFacing(value: String?) {
     val next = if (value == "front") CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
-    if (next == currentLensFacing) return
+    if (next == currentLensFacing) {
+      if (!cameraBound && isAttachedToWindow) bindCamera()
+      return
+    }
     if (recording != null) {
       emit("error", 0, 0, "CANNOT_SWITCH_DURING_RECORDING")
       return
@@ -107,6 +115,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
       streamObserver = null
       cameraProvider.unbindAll()
+      cameraBound = false
       val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
       val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also {
         it.setSurfaceProvider(previewView.surfaceProvider)
@@ -120,6 +129,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
         .build()
       val selector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
       cameraProvider.bindToLifecycle(owner, selector, nextPreview, nextVideo)
+      cameraBound = true
       preview = nextPreview
       videoCapture = nextVideo
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
@@ -137,6 +147,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       previewView.previewStreamState.observe(owner, observer)
       if (currentPath.isNotEmpty()) startRecording(currentPath)
     } catch (e: Exception) {
+      cameraBound = false
       emit("error", 0, 0, e.javaClass.simpleName + ": " + (e.message ?: "CAMERA_BIND_FAILED"))
     }
   }
@@ -243,6 +254,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     streamObserver = null
     try { provider?.unbindAll() } catch (_: Exception) {}
     provider = null
+    cameraBound = false
     preview = null
     videoCapture = null
   }
