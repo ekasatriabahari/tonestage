@@ -147,6 +147,7 @@ internal class AudioFileRecorder {
     var toSkip = skipFrames * channels
     var error = ""
     var captureStartNs = 0L // System.nanoTime() of frame 0 of the capture
+    var captureStartSet = false
     var timing = "none"
     var routed = false
     val timestamp = AudioTimestamp()
@@ -179,11 +180,11 @@ internal class AudioFileRecorder {
             lastPollNs = nowNs
             val status = rec.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC)
             if (status == AudioRecord.SUCCESS) {
-              if (timing != "timestamp") {
-                captureStartNs =
-                    timestamp.nanoTime - timestamp.framePosition * 1_000_000_000L / sampleRate
-                timing = "timestamp"
+              if (!captureStartSet) {
+                captureStartNs = timestamp.nanoTime - timestamp.framePosition * 1_000_000_000L / sampleRate
+                captureStartSet = true
               }
+              timing = "timestamp"
               if (!haveStamp) {
                 firstStampNs = timestamp.nanoTime
                 firstStampFrames = timestamp.framePosition
@@ -191,9 +192,10 @@ internal class AudioFileRecorder {
               }
               lastStampNs = timestamp.nanoTime
               lastStampFrames = timestamp.framePosition
-            } else if (timing == "none") {
+            } else if (!captureStartSet) {
               // Estimate: the first read returned right after capturing its frames.
               captureStartNs = nowNs - (usable / channels) * 1_000_000_000L / sampleRate
+              captureStartSet = true
               timing = "estimated"
             }
           }
