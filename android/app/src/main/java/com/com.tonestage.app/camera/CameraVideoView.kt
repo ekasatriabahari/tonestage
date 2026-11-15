@@ -292,6 +292,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     videoCapture = null
   }
 
+  companion object {
+    private const val TAG = "ToneStageCameraSurface"
+  }
+
   private fun emit(state: String, width: Int, height: Int, message: String) {
     val reactContext = context as? ReactContext ?: return
     val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
