@@ -209,10 +209,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val bufferHeight = previewCropRect?.height()?.takeIf { it > 0f } ?: viewHeight
     val crop = previewCropRect ?: RectF(0f, 0f, bufferWidth, bufferHeight)
     val matrix = Matrix()
-    // CameraX rotationDegrees describes the clockwise rotation required by its
-    // output pipeline. TextureView's transform maps the delivered buffer back
-    // into display space, so apply the inverse rotation here.
-    matrix.setRotate(-previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
+    // CameraX rotationDegrees is the clockwise rotation required to bring
+    // the delivered camera buffer into the target display orientation.
+    // TextureView does not apply this automatically for a custom SurfaceProvider.
+    matrix.setRotate(previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
 
     val rotatedCrop = RectF(crop)
     matrix.mapRect(rotatedCrop)
