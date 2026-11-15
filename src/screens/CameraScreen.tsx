@@ -59,10 +59,12 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
   const recordingLocked = ['starting', 'recording', 'paused', 'stopping'].includes(rec.phase);
 
   useEffect(() => {
-    if (source === 'yi' && !cameraActive) {
-      rec.abort('Koneksi kamera Yi terputus, rekaman dihentikan.');
+    if (recordingLocked && !rec.videoReady) {
+      rec.abort(source === 'yi'
+        ? 'Koneksi atau stream Yi terputus, rekaman dihentikan.'
+        : 'Kamera HP terputus, rekaman dihentikan.');
     }
-  }, [source, cameraActive, rec.abort]);
+  }, [recordingLocked, rec.videoReady, source, rec.abort]);
 
   const urlError = validateRtspUrl(url);
   const host = extractRtspHost(url);
