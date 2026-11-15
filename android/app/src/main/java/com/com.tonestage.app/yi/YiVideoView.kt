@@ -147,6 +147,10 @@ class YiVideoView(context: Context) : PlayerView(context) {
     recorder.start(File(path))
   }
 
+  fun setRecordingPaused(paused: Boolean) {
+    if (paused) recorder.pause() else recorder.resume()
+  }
+
   private fun finishRecording() {
     val result = recorder.stop() ?: return
     recorder.onStarted = null
