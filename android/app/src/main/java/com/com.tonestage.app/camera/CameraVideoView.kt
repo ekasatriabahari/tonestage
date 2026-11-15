@@ -63,8 +63,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   init {
     previewView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
-    // TextureView-based rendering is more reliable inside React Native layouts.
-    previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+    // Prefer SurfaceView for CameraX preview. On some devices the TextureView
+    // surface request never completes, causing Camera2 capture-session setup
+    // to time out even with Preview as the only use case.
+    previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
     addView(previewView)
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({
