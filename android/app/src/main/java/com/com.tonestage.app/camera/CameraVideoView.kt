@@ -64,10 +64,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   init {
     previewView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
-    // Prefer SurfaceView for CameraX preview. On some devices the TextureView
-    // surface request never completes, causing Camera2 capture-session setup
-    // to time out even with Preview as the only use case.
-    previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+    // Force TextureView for React Native embedding. SurfaceView can remain in
+    // "Wait for new Surface creation" when nested in a clipped/overlaid RN view,
+    // leaving Camera2 without a surface and causing its 5-second session timeout.
+    previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
     addView(previewView)
     addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
       Log.d(TAG, "container layout=${right - left}x${bottom - top} attached=$isAttachedToWindow laidOut=$isLaidOut")
