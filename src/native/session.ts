@@ -51,7 +51,7 @@ export function buildManifest(args: {
       frames: video.frames,
       width: video.width,
       height: video.height,
-      source: video.source,
+      ...(video.source ? { source: video.source } : {}),
     },
     guitar:
       audio === null
