@@ -237,6 +237,25 @@ internal class BackingTrackEngine(private val context: Context) {
     }
   }
 
+  /** Marks a pause caused by the unified recording transport (not a manual backing pause). */
+  fun beginRecordingPause() {
+    synchronized(logLock) {
+      if (!logging || logPauseStartUs > 0L) return
+      logPauseStartUs = System.nanoTime() / 1000
+    }
+  }
+
+  /** Closes the unified recording pause interval so export can compress that silent gap. */
+  fun endRecordingPause() {
+    synchronized(logLock) {
+      val pauseStart = logPauseStartUs
+      if (!logging || pauseStart <= 0L) return
+      val now = System.nanoTime() / 1000
+      if (now > pauseStart) pausedLogIntervals.add(pauseStart to now)
+      logPauseStartUs = 0L
+    }
+  }
+
   /**
    * Stops the log. Returns {logStartUs, logEndUs, runs: [{startNanoUs, startFileUs, endNanoUs}]}.
    * Inside a run the file position advances 1:1 with time: file position at time t is
