@@ -184,6 +184,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
             json.put("nonMonotonic", 0)
             json.put("csdFromFormat", false)
             json.put("firstSampleUs", startedAtUs)
+            json.put("source", if (currentLensFacing == CameraSelector.LENS_FACING_FRONT) "phone-front" else "phone-rear")
             emit("recorded", width, height, json.toString())
             currentPath = ""
             paused = false
