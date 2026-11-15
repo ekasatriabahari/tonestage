@@ -188,18 +188,14 @@ export function useBackingTrack(active: boolean) {
   }, [lastFile, loadFromUri]);
 
   const play = useCallback(async () => {
-    if (!(await playBacking())) {
-      setMessage(describeBackingError('PLAYBACK_FAILED'));
-    }
+    const ok = await playBacking();
+    if (!ok) setMessage(describeBackingError('PLAYBACK_FAILED'));
+    return ok;
   }, []);
 
-  const pause = useCallback(async () => {
-    await pauseBacking();
-  }, []);
+  const pause = useCallback(async () => pauseBacking(), []);
 
-  const stop = useCallback(async () => {
-    await stopBacking();
-  }, []);
+  const stop = useCallback(async () => stopBacking(), []);
 
   const markRecordingPause = useCallback(async () => {
     await beginBackingRecordingPause();
