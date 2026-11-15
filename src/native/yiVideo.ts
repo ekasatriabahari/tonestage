@@ -66,7 +66,7 @@ export type RecordingStats = {
   csdFromFormat: boolean;
   /** Time of the first video sample on the System.nanoTime() clock (microseconds). */
   firstSampleUs: number;
-  source: string;
+  source?: string;
 };
 
 /** What the preview reports about a video recording. */
@@ -97,7 +97,7 @@ export function parseRecordingStats(json: string): RecordingStats {
     nonMonotonic: num(e.nonMonotonic),
     csdFromFormat: e.csdFromFormat === true,
     firstSampleUs: num(e.firstSampleUs),
-    source: typeof e.source === 'string' ? e.source : 'unknown',
+    ...(typeof e.source === 'string' ? { source: e.source } : {}),
   };
 }
 
