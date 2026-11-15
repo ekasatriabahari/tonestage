@@ -74,7 +74,7 @@ export function RecordingPanel({ rec }: Props) {
               {rec.transportPending ? 'Memproses...' : rec.phase === 'paused' ? 'Lanjutkan' : rec.phase === 'starting' ? 'Memulai...' : 'Pause'}
             </Text>
           </Pressable>
-          <Pressable onPress={rec.stop} disabled={rec.transportPending || rec.phase === 'starting'} accessibilityRole="button" style={[styles.stopButton, (rec.transportPending || rec.phase === 'starting') && styles.disabled]}>
+          <Pressable onPress={rec.stop} disabled={rec.transportPending || (rec.phase === 'starting' && !rec.canStopStarting)} accessibilityRole="button" style={[styles.stopButton, (rec.transportPending || (rec.phase === 'starting' && !rec.canStopStarting)) && styles.disabled]}>
             <Text style={styles.controlText}>Stop</Text>
           </Pressable>
         </View>
