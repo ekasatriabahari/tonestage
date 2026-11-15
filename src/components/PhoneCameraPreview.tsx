@@ -85,7 +85,7 @@ export function PhoneCameraPreview({
           <Text style={styles.badgeText}>
             {video.width > 0 ? `${video.width}×${video.height}` : 'Kamera HP'}
             {recordingPath !== '' ? '  REC' : ''}
-            {recordingPaused ? '  PAUSED' : ''}
+            {recordingPaused && recordingPath !== '' ? '  PAUSED' : ''}
           </Text>
         </View>
       ) : null}
