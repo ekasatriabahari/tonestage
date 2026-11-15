@@ -68,7 +68,6 @@ internal class BackingTrackEngine(private val context: Context) {
   private val finishedRuns = ArrayList<RunRecord>()
   private val pausedLogIntervals = ArrayList<Pair<Long, Long>>()
   private var logPauseStartUs = 0L
-  @Volatile private var recordingPauseRequested = false
   @Volatile private var requestedDevice: AudioDeviceInfo? = null
   @Volatile private var stopFlag = false
   @Volatile private var wantPaused = false
@@ -230,7 +229,6 @@ internal class BackingTrackEngine(private val context: Context) {
       finishedRuns.clear()
       pausedLogIntervals.clear()
       logPauseStartUs = 0L
-      recordingPauseRequested = false
       currentRun = null
       runOpen = false
       logStartUs = System.nanoTime() / 1000
@@ -454,21 +452,12 @@ internal class BackingTrackEngine(private val context: Context) {
           session.pauseTrack()
           val pauseAtUs = System.nanoTime() / 1000
           endRunIfOpen(pauseAtUs)
-          synchronized(logLock) {
-            if (logging && recordingPauseRequested && logPauseStartUs == 0L) logPauseStartUs = pauseAtUs
-          }
           state = State.PAUSED
           Thread.sleep(20)
           continue
         }
         state = State.PLAYING
         session.ensurePlaying()
-        synchronized(logLock) {
-          if (logging && !recordingPauseRequested && logPauseStartUs > 0L) {
-            pausedLogIntervals.add(logPauseStartUs to (System.nanoTime() / 1000))
-            logPauseStartUs = 0L
-          }
-        }
         if (logging) {
           session.logAnchor()
         }
