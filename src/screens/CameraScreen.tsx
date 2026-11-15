@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown, Check } from 'lucide-react-native';
 import {
   PermissionsAndroid,
   Pressable,
@@ -51,6 +52,7 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(DEFAULT_YI_RTSP_URL);
   const [source, setSource] = useState<CameraSource>('yi');
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const [cameraPermission, setCameraPermission] = useState(false);
   const [cameraPermissionMessage, setCameraPermissionMessage] = useState<string | null>(null);
   const { state, activate, deactivate } = useYiActivation();
@@ -117,21 +119,39 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sumber Video</Text>
-        <View style={styles.sourceRow}>
-          {sourceOptions.map(option => {
-            const selected = source === option.id;
-            return (
-              <Pressable
-                key={option.id}
-                onPress={() => chooseSource(option.id)}
-                disabled={recordingLocked}
-                accessibilityRole="button"
-                accessibilityState={{ selected, disabled: recordingLocked }}
-                style={[styles.sourceOption, selected && styles.sourceOptionActive, recordingLocked && styles.sourceOptionDisabled]}>
-                <Text style={[styles.sourceText, selected && styles.sourceTextActive]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.sourceDropdownWrap}>
+          <Pressable
+            onPress={() => setSourceMenuOpen(open => !open)}
+            disabled={recordingLocked}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: sourceMenuOpen, disabled: recordingLocked }}
+            style={[styles.sourceDropdown, recordingLocked && styles.sourceOptionDisabled]}>
+            <Text style={styles.sourceDropdownText}>
+              {sourceOptions.find(option => option.id === source)?.label ?? 'Pilih sumber video'}
+            </Text>
+            <ChevronDown size={18} color={colors.inkMuted} />
+          </Pressable>
+          {sourceMenuOpen && !recordingLocked ? (
+            <View style={styles.sourceMenu}>
+              {sourceOptions.map(option => {
+                const selected = source === option.id;
+                return (
+                  <Pressable
+                    key={option.id}
+                    onPress={() => {
+                      setSourceMenuOpen(false);
+                      void chooseSource(option.id);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={styles.sourceMenuItem}>
+                    <Text style={[styles.sourceMenuText, selected && styles.sourceTextActive]}>{option.label}</Text>
+                    {selected ? <Check size={17} color={colors.accent} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
         {recordingLocked ? <Text style={styles.helpText}>Sumber kamera tidak dapat diganti saat sesi aktif.</Text> : null}
       </View>
@@ -232,9 +252,12 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
   section: { gap: 8 },
   sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '700' },
-  sourceRow: { flexDirection: 'row', gap: 6 },
-  sourceOption: { flex: 1, minHeight: 42, borderColor: colors.border, borderWidth: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, backgroundColor: colors.surface },
-  sourceOptionActive: { borderColor: colors.accent, backgroundColor: colors.surfaceRaised },
+  sourceDropdownWrap: { position: 'relative', zIndex: 20 },
+  sourceDropdown: { minHeight: 46, borderColor: colors.border, borderWidth: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'space-between', flexDirection: 'row', paddingHorizontal: 14, backgroundColor: colors.surface },
+  sourceDropdownText: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  sourceMenu: { marginTop: 6, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  sourceMenuItem: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  sourceMenuText: { color: colors.inkMuted, fontSize: 14, fontWeight: '500' },
   sourceOptionDisabled: { opacity: 0.55 },
   sourceText: { color: colors.inkMuted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
   sourceTextActive: { color: colors.accent },
