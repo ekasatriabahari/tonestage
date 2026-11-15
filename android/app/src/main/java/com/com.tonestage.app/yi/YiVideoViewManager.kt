@@ -31,7 +31,7 @@ class YiVideoViewManager :
   }
 
   @ReactProp(name = "recordingPaused", defaultBoolean = false)
-  fun setRecordingPaused(view: YiVideoView, value: Boolean) = view.setRecordingPaused(value)
+  override fun setRecordingPaused(view: YiVideoView, value: Boolean) = view.setRecordingPaused(value)
 
   override fun onDropViewInstance(view: YiVideoView) {
     view.release()
