@@ -26,6 +26,7 @@ internal class StreamRecorder {
   }
 
   private var state = State.IDLE
+  @Volatile private var paused = false
   private var file: File? = null
   private var muxer: MediaMuxer? = null
   private var trackIndex = -1
@@ -91,13 +92,14 @@ internal class StreamRecorder {
     nonMonotonic = 0
     droppedBeforeStart = 0
     csdFromFormat = false
+    paused = false
     state = State.WAITING_KEYFRAME
   }
 
   /** [data] is read without changing it. [timeUs] is the sample time from the stream. */
   @Synchronized
   fun onSample(data: ByteBuffer, timeUs: Long, flaggedKeyFrame: Boolean) {
-    if (state != State.WAITING_KEYFRAME && state != State.RUNNING) {
+    if (paused || (state != State.WAITING_KEYFRAME && state != State.RUNNING)) {
       return
     }
     val view = data.duplicate()
@@ -191,6 +193,16 @@ internal class StreamRecorder {
     }
   }
 
+  @Synchronized
+  fun pause() {
+    if (state == State.WAITING_KEYFRAME || state == State.RUNNING) paused = true
+  }
+
+  @Synchronized
+  fun resume() {
+    if (state == State.WAITING_KEYFRAME || state == State.RUNNING) paused = false
+  }
+
   /** Finishes the file. Returns the measured result, or null if no recording was started. */
   @Synchronized
   fun stop(): JSONObject? {
@@ -240,6 +252,7 @@ internal class StreamRecorder {
     // On the same clock as the audio recorder (System.nanoTime), so the two can be aligned.
     json.put("firstSampleUs", firstSampleNs / 1000)
     state = State.IDLE
+    paused = false
     file = null
     return json
   }
