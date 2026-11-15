@@ -383,6 +383,7 @@ export function useCombinedRecording(backing: BackingTrack) {
     setVideoReady,
     phase,
     videoRecordingPath,
+    canStopStarting: videoRecordingPath !== '',
     videoRecordingPaused,
     transportPending,
     message,
