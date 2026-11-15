@@ -207,7 +207,9 @@ export function useCombinedRecording(backing: BackingTrack) {
 
   const resume = useCallback(async () => {
     if (phase !== 'paused') return;
-    await latest.current.play();
+    if (latest.current.loadedUri !== null && latest.current.loaded !== null) {
+      await latest.current.play();
+    }
     setVideoRecordingPaused(false);
     setPhase('recording');
   }, [phase]);
