@@ -187,7 +187,10 @@ export function useCombinedRecording(backing: BackingTrack) {
     logActive.current = true;
     if (b.loadedUri !== null && b.loaded !== null) {
       await b.seekTo(0);
-      await b.play();
+      if (!(await b.play())) {
+        await fail('Backing track gagal dimulai. Periksa file dan output audio, lalu coba lagi.');
+        return;
+      }
     }
     const began = await beginAudioCapture(choice.id, created.audioPath);
     if (!began.ok) {
