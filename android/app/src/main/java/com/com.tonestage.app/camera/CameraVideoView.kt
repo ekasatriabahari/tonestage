@@ -2,6 +2,8 @@ package com.tonestage.app.camera
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.view.OrientationEventListener
+import android.view.Surface
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.MirrorMode
@@ -32,6 +34,19 @@ import org.json.JSONObject
 class CameraVideoView(context: Context) : FrameLayout(context) {
   private val previewView = PreviewView(context)
   private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
+  private val orientationListener = object : OrientationEventListener(context) {
+    override fun onOrientationChanged(orientation: Int) {
+      if (orientation == ORIENTATION_UNKNOWN) return
+      val rotation = when (orientation) {
+        in 45..134 -> Surface.ROTATION_270
+        in 135..224 -> Surface.ROTATION_180
+        in 225..314 -> Surface.ROTATION_90
+        else -> Surface.ROTATION_0
+      }
+      preview?.targetRotation = rotation
+      videoCapture?.targetRotation = rotation
+    }
+  }
   private var provider: ProcessCameraProvider? = null
   private var preview: Preview? = null
   private var videoCapture: VideoCapture<Recorder>? = null
@@ -54,6 +69,16 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       provider = future.get()
       bindCamera()
     }, mainExecutor)
+  }
+
+  override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
+    orientationListener.enable()
+  }
+
+  override fun onDetachedFromWindow() {
+    orientationListener.disable()
+    super.onDetachedFromWindow()
   }
 
   fun setLensFacing(value: String?) {
@@ -82,13 +107,15 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       streamObserver?.let { previewView.previewStreamState.removeObserver(it) }
       streamObserver = null
       cameraProvider.unbindAll()
-      val nextPreview = Preview.Builder().build().also {
+      val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
+      val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also {
         it.setSurfaceProvider(previewView.surfaceProvider)
       }
       val recorder = Recorder.Builder()
         .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
         .build()
       val nextVideo = VideoCapture.Builder(recorder)
+        .setTargetRotation(rotation)
         .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
         .build()
       val selector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
