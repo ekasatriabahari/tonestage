@@ -298,7 +298,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     previewTexture.translationX = transformedSurface.left - previewTexture.left
     previewTexture.translationY = transformedSurface.top - previewTexture.top
 
-    Log.d(TAG, "applied preview matrix lens=$currentLensFacing rotationDegrees=$previewRotationDegrees targetRotation=$previewTargetRotation mirrored=$previewMirroring surface=\${resolution.width}x\${resolution.height} crop=\${crop.width()}x\${crop.height()} view=\${viewWidth}x\${viewHeight} mapped=\${transformedSurface.width()}x\${transformedSurface.height()} offset=\${transformedSurface.left},\${transformedSurface.top}")
+    Log.d(TAG, "applied preview matrix lens=$currentLensFacing rotationDegrees=$previewRotationDegrees targetRotation=$previewTargetRotation mirrored=$previewMirroring surface=${resolution.width}x${resolution.height} crop=${crop.width()}x${crop.height()} view=${viewWidth}x${viewHeight} mapped=${transformedSurface.width()}x${transformedSurface.height()} offset=${transformedSurface.left},${transformedSurface.top}")
   }
 
   /** Fulfil CameraX's SurfaceRequest using the TextureView SurfaceTexture. */
