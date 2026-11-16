@@ -200,11 +200,11 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val crop = previewCropRect ?: return
     if (crop.width() <= 0f || crop.height() <= 0f) return
 
-    // SurfaceRequest.TransformationInfo.rotationDegrees is the clockwise
-    // correction required to display this camera buffer at targetRotation.
-    // Do not infer the angle from buffer/view aspect ratios: front and rear
-    // sensors can legitimately report different corrections.
-    val transformRotation = previewRotationDegrees.toFloat()
+    // SurfaceRequest reports the clockwise correction for CameraX's
+    // output coordinate space. TextureView.setTransform operates on the
+    // SurfaceTexture view space, whose required correction is the inverse.
+    // Keep this metadata-driven per-lens (never infer it from aspect ratio).
+    val transformRotation = -previewRotationDegrees.toFloat()
     val rotate = Matrix().apply {
       setRotate(transformRotation, crop.centerX(), crop.centerY())
     }
