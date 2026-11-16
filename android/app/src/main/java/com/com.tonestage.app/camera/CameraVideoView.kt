@@ -188,9 +188,9 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   }
 
   /**
-   * Rotate the camera buffer into the upright orientation, then center-crop
-   * it to the TextureView bounds. CameraX's rotationDegrees is inverted here
-   * because Matrix operates on the TextureView's raw buffer coordinate space.
+   * Apply CameraX's explicit clockwise rotation correction to the raw
+   * SurfaceTexture buffer, then apply front-camera mirroring independently.
+   * Finally center-crop the transformed buffer to the TextureView bounds.
    */
   private fun applyPreviewTransform() {
     val viewWidth = previewTexture.width.toFloat()
@@ -200,17 +200,11 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val crop = previewCropRect ?: return
     if (crop.width() <= 0f || crop.height() <= 0f) return
 
-    // CameraX delivers opposite sensor-orientation corrections for the two
-    // lenses on this device. TextureView's buffer transform needs the rear
-    // correction inverted, while the front preview's horizontal mirror
-    // reverses the apparent rotation direction once more.
-    // Keep rotation and mirroring as separate matrix operations.
-    val quarterTurn = when {
-      viewHeight > viewWidth && crop.width() > crop.height() -> 90f
-      viewWidth > viewHeight && crop.height() > crop.width() -> -90f
-      else -> 0f
-    }
-    val transformRotation = if (previewMirroring) quarterTurn else -quarterTurn
+    // SurfaceRequest.TransformationInfo.rotationDegrees is the clockwise
+    // correction required to display this camera buffer at targetRotation.
+    // Do not infer the angle from buffer/view aspect ratios: front and rear
+    // sensors can legitimately report different corrections.
+    val transformRotation = previewRotationDegrees.toFloat()
     val rotate = Matrix().apply {
       setRotate(transformRotation, crop.centerX(), crop.centerY())
     }
