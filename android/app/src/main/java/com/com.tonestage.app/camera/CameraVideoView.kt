@@ -5,14 +5,11 @@ import android.media.MediaMetadataRetriever
 import android.util.Log
 import android.view.OrientationEventListener
 import android.view.Surface
-import android.graphics.Matrix
-import android.graphics.RectF
-import android.graphics.SurfaceTexture
-import android.view.TextureView
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
+import androidx.camera.view.PreviewView
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
@@ -35,13 +32,9 @@ import org.json.JSONObject
 
 /** CameraX preview and video-only recorder for the phone's front or rear camera. */
 class CameraVideoView(context: Context) : FrameLayout(context) {
-  private val previewTexture = TextureView(context)
+  private val previewView = PreviewView(context)
   private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
-  private var pendingSurfaceRequest: androidx.camera.core.SurfaceRequest? = null
-  private var activePreviewSurface: Surface? = null
   private var previewFrameReceived = false
-  private var previewRotationDegrees = 0
-  private var previewCropRect: RectF? = null
   private val orientationListener = object : OrientationEventListener(context) {
     override fun onOrientationChanged(orientation: Int) {
       if (orientation == ORIENTATION_UNKNOWN) return
@@ -68,40 +61,12 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private var cameraBound = false
 
   init {
-    previewTexture.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-    previewTexture.isOpaque = true
-    previewTexture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-      override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        Log.d(TAG, "TextureView surface available=${width}x${height}")
-        providePendingSurface()
-      }
-      override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
-        Log.d(TAG, "TextureView surface size=${width}x${height}")
-        providePendingSurface()
-      }
-      override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-        Log.d(TAG, "TextureView surface destroyed")
-        pendingSurfaceRequest = null
-        activePreviewSurface?.release()
-        activePreviewSurface = null
-        return true
-      }
-      override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-        if (!previewFrameReceived) {
-          previewFrameReceived = true
-          Log.d(TAG, "TextureView first preview frame received")
-          emit("playing", 1280, 720, "")
-        }
-      }
-    }
-    addView(previewTexture)
+    previewView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+    previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+    previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+    addView(previewView)
     addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
       Log.d(TAG, "container layout=${right - left}x${bottom - top} attached=$isAttachedToWindow laidOut=$isLaidOut")
-    }
-    previewTexture.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
-      Log.d(TAG, "TextureView layout=${right - left}x${bottom - top} available=${previewTexture.isAvailable}")
-      applyPreviewTransform()
-      providePendingSurface()
     }
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({
@@ -113,7 +78,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    Log.d(TAG, "onAttached width=$width height=$height texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable} laidOut=$isLaidOut")
+    Log.d(TAG, "onAttached width=$width height=$height preview=${previewView.width}x${previewView.height} laidOut=$isLaidOut")
     orientationListener.enable()
     // The React Activity/lifecycle owner may not be available during view construction.
     if (!cameraBound && provider != null) post { bindCamera(includeVideoCapture = currentPath.isNotEmpty()) }
@@ -150,24 +115,12 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       return
     }
     try {
-      Log.d(TAG, "bindCamera start lens=$currentLensFacing includeVideoCapture=$includeVideoCapture texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable}")
-      pendingSurfaceRequest?.willNotProvideSurface()
-      pendingSurfaceRequest = null
+      Log.d(TAG, "bindCamera start lens=$currentLensFacing includeVideoCapture=$includeVideoCapture preview=${previewView.width}x${previewView.height}")
       cameraProvider.unbindAll()
       cameraBound = false
-      val rotation = previewTexture.display?.rotation ?: Surface.ROTATION_0
+      val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
       val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also { useCase ->
-        useCase.setSurfaceProvider(mainExecutor) { request ->
-          Log.d(TAG, "SurfaceProvider request resolution=${request.resolution} texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable}")
-          request.setTransformationInfoListener(mainExecutor) { info ->
-            previewRotationDegrees = info.rotationDegrees
-            previewCropRect = RectF(info.cropRect)
-            applyPreviewTransform()
-            Log.d(TAG, "preview transform rotation=${info.rotationDegrees} crop=${info.cropRect}")
-          }
-          pendingSurfaceRequest = request
-          providePendingSurface()
-        }
+        useCase.setSurfaceProvider(mainExecutor, previewView.surfaceProvider)
       }
       val nextVideo = if (includeVideoCapture) {
         val recorder = Recorder.Builder()
@@ -190,91 +143,6 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       Log.e(TAG, "bindCamera failed", e)
       cameraBound = false
       emit("error", 0, 0, e.javaClass.simpleName + ": " + (e.message ?: "CAMERA_BIND_FAILED"))
-    }
-  }
-
-  /**
-   * Match CameraX's buffer orientation to the current preview container.
-   * TextureView otherwise stretches the camera buffer to the view bounds.
-   */
-  private fun applyPreviewTransform() {
-    val viewWidth = previewTexture.width.toFloat()
-    val viewHeight = previewTexture.height.toFloat()
-    if (viewWidth <= 0f || viewHeight <= 0f || !previewTexture.isAvailable) return
-
-    val crop = previewCropRect ?: return
-    if (crop.width() <= 0f || crop.height() <= 0f) return
-
-    // Rotate the camera buffer around the crop center first.
-    val rotate = Matrix().apply {
-      setRotate(previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
-    }
-    val rotatedBounds = RectF(crop)
-    rotate.mapRect(rotatedBounds)
-    if (rotatedBounds.width() <= 0f || rotatedBounds.height() <= 0f) return
-
-    // Center-crop the rotated buffer into the TextureView bounds.
-    val scale = maxOf(viewWidth / rotatedBounds.width(), viewHeight / rotatedBounds.height())
-    val translateX = viewWidth / 2f - rotatedBounds.centerX() * scale
-    val translateY = viewHeight / 2f - rotatedBounds.centerY() * scale
-    val fit = Matrix().apply {
-      setValues(floatArrayOf(
-        scale, 0f, translateX,
-        0f, scale, translateY,
-        0f, 0f, 1f
-      ))
-    }
-
-    // Final mapping: source buffer -> rotation -> center-crop view mapping.
-    val transform = Matrix()
-    transform.setConcat(fit, rotate)
-    previewTexture.setTransform(transform)
-
-    Log.d(TAG, "applied preview matrix rotation=" + previewRotationDegrees +
-      " buffer=" + crop.width() + "x" + crop.height() +
-      " rotated=" + rotatedBounds.width() + "x" + rotatedBounds.height() +
-      " view=" + viewWidth + "x" + viewHeight + " scale=" + scale)
-  }
-
-  /** Provide CameraX a Surface backed directly by TextureView. */
-  private fun providePendingSurface() {
-    val request = pendingSurfaceRequest ?: return
-    if (!previewTexture.isAvailable || previewTexture.width <= 0 || previewTexture.height <= 0) {
-      Log.d(TAG, "SurfaceRequest waiting for TextureView availability")
-      return
-    }
-    if (released || !isAttachedToWindow) {
-      pendingSurfaceRequest = null
-      request.willNotProvideSurface()
-      return
-    }
-    pendingSurfaceRequest = null
-    val texture = previewTexture.surfaceTexture ?: run {
-      pendingSurfaceRequest = request
-      return
-    }
-    val resolution = request.resolution
-    try {
-      texture.setDefaultBufferSize(resolution.width, resolution.height)
-      previewFrameReceived = false
-      if (previewCropRect == null) previewCropRect = RectF(0f, 0f, resolution.width.toFloat(), resolution.height.toFloat())
-      applyPreviewTransform()
-      val surface = Surface(texture)
-      activePreviewSurface = surface
-      Log.d(TAG, "provideSurface resolution=${resolution.width}x${resolution.height}")
-      request.provideSurface(surface, mainExecutor) { result ->
-        Log.d(TAG, "provideSurface result=${result.resultCode}")
-        if (activePreviewSurface === surface) activePreviewSurface = null
-        surface.release()
-        if (result.resultCode != androidx.camera.core.SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY && !released) {
-          emit("preparing", 1280, 720, "PREVIEW_SURFACE_RESULT_${result.resultCode}")
-        }
-      }
-    } catch (e: Exception) {
-      Log.e(TAG, "provideSurface failed", e)
-      activePreviewSurface?.release()
-      activePreviewSurface = null
-      emit("error", 0, 0, "PREVIEW_SURFACE_FAILED: ${e.message ?: e.javaClass.simpleName}")
     }
   }
 
@@ -384,10 +252,6 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     orientationListener.disable()
     stopRecording()
     try { provider?.unbindAll() } catch (_: Exception) {}
-    pendingSurfaceRequest?.willNotProvideSurface()
-    pendingSurfaceRequest = null
-    activePreviewSurface?.release()
-    activePreviewSurface = null
     provider = null
     cameraBound = false
     preview = null
