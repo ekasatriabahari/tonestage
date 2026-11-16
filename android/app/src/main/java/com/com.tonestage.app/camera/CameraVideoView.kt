@@ -21,6 +21,7 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
@@ -34,7 +35,7 @@ import org.json.JSONObject
 class CameraVideoView(context: Context) : FrameLayout(context) {
   private val previewView = PreviewView(context)
   private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
-  private var previewFrameReceived = false
+  private var streamStateObserver: Observer<PreviewView.StreamState>? = null
   private val orientationListener = object : OrientationEventListener(context) {
     override fun onOrientationChanged(orientation: Int) {
       if (orientation == ORIENTATION_UNKNOWN) return
@@ -132,6 +133,21 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
           .build()
       } else null
       val selector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
+      // PreviewView exposes the actual camera stream state. Use it to hide the
+      // preparing overlay only after CameraX has delivered preview frames.
+      streamStateObserver?.let { previewView.previewStreamState.removeObserver(it) }
+      val observer = Observer<PreviewView.StreamState> { state ->
+        Log.d(TAG, "PreviewView streamState=$state lens=$currentLensFacing")
+        if (released) return@Observer
+        if (state == PreviewView.StreamState.STREAMING) {
+          emit("playing", 1280, 720, "")
+        } else {
+          emit("preparing", 1280, 720, "")
+        }
+      }
+      streamStateObserver = observer
+      previewView.previewStreamState.observe(owner, observer)
+
       if (nextVideo != null) cameraProvider.bindToLifecycle(owner, selector, nextPreview, nextVideo)
       else cameraProvider.bindToLifecycle(owner, selector, nextPreview)
       cameraBound = true
@@ -251,6 +267,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     released = true
     orientationListener.disable()
     stopRecording()
+    streamStateObserver?.let { previewView.previewStreamState.removeObserver(it) }
+    streamStateObserver = null
     try { provider?.unbindAll() } catch (_: Exception) {}
     provider = null
     cameraBound = false
