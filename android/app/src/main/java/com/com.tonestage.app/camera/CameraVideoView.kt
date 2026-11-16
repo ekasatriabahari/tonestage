@@ -293,8 +293,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     surfaceToView.mapRect(transformedSurface)
     previewTexture.pivotX = 0f
     previewTexture.pivotY = 0f
-    previewTexture.scaleX = transformedSurface.width() / resolution.width.toFloat()
-    previewTexture.scaleY = transformedSurface.height() / resolution.height.toFloat()
+    previewTexture.scaleX = transformedSurface.width() / viewWidth
+    previewTexture.scaleY = transformedSurface.height() / viewHeight
     previewTexture.translationX = transformedSurface.left - previewTexture.left
     previewTexture.translationY = transformedSurface.top - previewTexture.top
 
