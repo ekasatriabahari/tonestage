@@ -200,16 +200,17 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val crop = previewCropRect ?: return
     if (crop.width() <= 0f || crop.height() <= 0f) return
 
-    // Rotate each lens into the upright view orientation. The front camera
-    // is mirrored below; that reflection reverses the apparent direction of
-    // rotation, so its rotation sign must be opposite to the rear camera.
-    // Use the actual buffer/view aspect so the preview also adapts to landscape.
+    // CameraX delivers opposite sensor-orientation corrections for the two
+    // lenses on this device. TextureView's buffer transform needs the rear
+    // correction inverted, while the front preview's horizontal mirror
+    // reverses the apparent rotation direction once more.
+    // Keep rotation and mirroring as separate matrix operations.
     val quarterTurn = when {
       viewHeight > viewWidth && crop.width() > crop.height() -> 90f
       viewWidth > viewHeight && crop.height() > crop.width() -> -90f
       else -> 0f
     }
-    val transformRotation = if (previewMirroring) -quarterTurn else quarterTurn
+    val transformRotation = if (previewMirroring) quarterTurn else -quarterTurn
     val rotate = Matrix().apply {
       setRotate(transformRotation, crop.centerX(), crop.centerY())
     }
@@ -239,7 +240,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     transform.setConcat(fit, orientation)
     previewTexture.setTransform(transform)
 
-    Log.d(TAG, "applied preview matrix metadataRotation=$previewRotationDegrees transformRotation=$transformRotation mirrored=$previewMirroring buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
+    Log.d(TAG, "applied preview matrix lens=$currentLensFacing metadataRotation=$previewRotationDegrees transformRotation=$transformRotation mirrored=$previewMirroring buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
   }
 
   /** Fulfil CameraX's SurfaceRequest using the TextureView SurfaceTexture. */
