@@ -144,10 +144,18 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       previewCropRect = null
       previewRotationDegrees = 0
       previewMirroring = false
+      previewResolution = null
+      previewTargetRotation = Surface.ROTATION_0
+      previewTexture.scaleX = 1f
+      previewTexture.scaleY = 1f
+      previewTexture.translationX = 0f
+      previewTexture.translationY = 0f
+      previewTexture.setTransform(Matrix())
       previewFrameReceived = false
       cameraProvider.unbindAll()
       cameraBound = false
       val rotation = previewTexture.display?.rotation ?: Surface.ROTATION_0
+      previewTargetRotation = rotation
       val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also { useCase ->
         useCase.setSurfaceProvider(mainExecutor) { request ->
           Log.d(TAG, "SurfaceProvider request resolution=${request.resolution} texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable}")
@@ -224,12 +232,14 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       }
       val correctedBounds = RectF(surfaceRect)
       correctionRotation.mapRect(correctedBounds)
-      val correctionScaleX = surfaceRect.width() / correctedBounds.width()
-      val correctionScaleY = surfaceRect.height() / correctedBounds.height()
+      val correctionScale = maxOf(
+        surfaceRect.width() / correctedBounds.width(),
+        surfaceRect.height() / correctedBounds.height()
+      )
       val correctionFit = Matrix().apply {
         setValues(floatArrayOf(
-          correctionScaleX, 0f, surfaceRect.centerX() - correctedBounds.centerX() * correctionScaleX,
-          0f, correctionScaleY, surfaceRect.centerY() - correctedBounds.centerY() * correctionScaleY,
+          correctionScale, 0f, surfaceRect.centerX() - correctedBounds.centerX() * correctionScale,
+          0f, correctionScale, surfaceRect.centerY() - correctedBounds.centerY() * correctionScale,
           0f, 0f, 1f
         ))
       }
