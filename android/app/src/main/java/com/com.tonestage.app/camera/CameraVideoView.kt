@@ -36,19 +36,6 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private val previewView = PreviewView(context)
   private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
   private var streamStateObserver: Observer<PreviewView.StreamState>? = null
-  private val orientationListener = object : OrientationEventListener(context) {
-    override fun onOrientationChanged(orientation: Int) {
-      if (orientation == ORIENTATION_UNKNOWN) return
-      val rotation = when (orientation) {
-        in 45..134 -> Surface.ROTATION_270
-        in 135..224 -> Surface.ROTATION_180
-        in 225..314 -> Surface.ROTATION_90
-        else -> Surface.ROTATION_0
-      }
-      preview?.targetRotation = rotation
-      videoCapture?.targetRotation = rotation
-    }
-  }
   private var provider: ProcessCameraProvider? = null
   private var preview: Preview? = null
   private var videoCapture: VideoCapture<Recorder>? = null
@@ -80,13 +67,11 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     Log.d(TAG, "onAttached width=$width height=$height preview=${previewView.width}x${previewView.height} laidOut=$isLaidOut")
-    orientationListener.enable()
     // The React Activity/lifecycle owner may not be available during view construction.
     if (!cameraBound && provider != null) post { bindCamera(includeVideoCapture = currentPath.isNotEmpty()) }
   }
 
   override fun onDetachedFromWindow() {
-    orientationListener.disable()
     super.onDetachedFromWindow()
   }
 
