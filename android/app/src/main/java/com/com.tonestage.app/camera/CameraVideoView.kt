@@ -203,9 +203,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
    * Port of CameraX PreviewTransformation for a custom TextureView surface.
    *
    * TextureView.setTransform only corrects display rotation. CameraX's
-   * rotationDegrees/cropRect are applied to the TextureView's view geometry,
-   * not directly as a buffer-pixel matrix. Front-camera mirroring also changes
-   * axis when the upright output is rotated by 90/270 degrees.
+   * rotationDegrees/cropRect determine the visible surface bounds. TextureView
+   * already handles the camera sensor orientation and front-camera mirroring.
    */
   private fun applyPreviewTransform() {
     val viewWidth = previewTexture.width.toFloat()
@@ -260,7 +259,6 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       ))
     }
     val surfaceToView = Matrix().apply { setConcat(fit, rotate) }
-
 
     // Apply the crop/rotation as View geometry, separate from TextureView's
     // display correction, matching CameraX PreviewTransformation.
