@@ -225,25 +225,14 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     // TextureView does not account for display rotation itself. Apply only
     // the inverse target-display rotation here (not sensor rotationDegrees).
     val surfaceRect = RectF(0f, 0f, resolution.width.toFloat(), resolution.height.toFloat())
-    val textureCorrection = Matrix()
-    if (targetRotationDegrees != 0f) {
-      val correctionRotation = Matrix().apply {
-        setRotate(-targetRotationDegrees, surfaceRect.centerX(), surfaceRect.centerY())
+    val textureCorrection = Matrix().apply {
+      val normalizedRect = RectF(-1f, -1f, 1f, 1f)
+      setRectToRect(surfaceRect, normalizedRect, Matrix.ScaleToFit.FILL)
+      postRotate(-targetRotationDegrees)
+      val restore = Matrix().apply {
+        setRectToRect(normalizedRect, surfaceRect, Matrix.ScaleToFit.FILL)
       }
-      val correctedBounds = RectF(surfaceRect)
-      correctionRotation.mapRect(correctedBounds)
-      val correctionScale = maxOf(
-        surfaceRect.width() / correctedBounds.width(),
-        surfaceRect.height() / correctedBounds.height()
-      )
-      val correctionFit = Matrix().apply {
-        setValues(floatArrayOf(
-          correctionScale, 0f, surfaceRect.centerX() - correctedBounds.centerX() * correctionScale,
-          0f, correctionScale, surfaceRect.centerY() - correctedBounds.centerY() * correctionScale,
-          0f, 0f, 1f
-        ))
-      }
-      textureCorrection.setConcat(correctionFit, correctionRotation)
+      postConcat(restore)
     }
     previewTexture.setTransform(textureCorrection)
 
@@ -272,20 +261,6 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     }
     val surfaceToView = Matrix().apply { setConcat(fit, rotate) }
 
-    // CameraX mirrors front-camera output in the Surface. Compensate in the
-    // source coordinate system: vertical flip for 90/270, horizontal for 0/180.
-    if (previewMirroring) {
-      val mirror = Matrix().apply {
-        if (rotation.toInt() % 180 != 0) {
-          setScale(1f, -1f, crop.centerX(), crop.centerY())
-        } else {
-          setScale(-1f, 1f, crop.centerX(), crop.centerY())
-        }
-      }
-      val mirroredSurfaceToView = Matrix()
-      mirroredSurfaceToView.setConcat(surfaceToView, mirror)
-      surfaceToView.set(mirroredSurfaceToView)
-    }
 
     // Apply the crop/rotation as View geometry, separate from TextureView's
     // display correction, matching CameraX PreviewTransformation.
