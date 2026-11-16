@@ -10,7 +10,7 @@ export type SessionManifest = {
   title?: string;
   id: string;
   createdMs: number;
-  video: { path: string; firstSampleUs: number; mediaDurationMs: number; frames: number; width: number; height: number };
+  video: { path: string; firstSampleUs: number; mediaDurationMs: number; frames: number; width: number; height: number; source?: string };
   guitar: null | {
     path: string;
     startUs: number;
@@ -51,6 +51,7 @@ export function buildManifest(args: {
       frames: video.frames,
       width: video.width,
       height: video.height,
+      ...(video.source ? { source: video.source } : {}),
     },
     guitar:
       audio === null
@@ -205,7 +206,8 @@ export function summarizeSession(s: SessionInfo): string[] {
     const video = (typeof m.video === 'object' && m.video !== null ? m.video : {}) as Record<string, unknown>;
     const guitar = typeof m.guitar === 'object' && m.guitar !== null ? (m.guitar as Record<string, unknown>) : null;
     const backing = typeof m.backing === 'object' && m.backing !== null ? (m.backing as Record<string, unknown>) : null;
-    lines.push(`Video: ${num(video.width)}x${num(video.height)}, ${(num(video.mediaDurationMs) / 1000).toFixed(1)} dtk`);
+    const sourceLabel = video.source === 'yi-rtsp' ? 'Yi Action Cam' : video.source === 'phone-front' ? 'Front Camera' : video.source === 'phone-rear' ? 'Rear Camera' : '';
+    lines.push(`Video: ${num(video.width)}x${num(video.height)}, ${(num(video.mediaDurationMs) / 1000).toFixed(1)} dtk${sourceLabel ? ` — ${sourceLabel}` : ''}`);
     if (guitar === null) {
       lines.push('Gitar: tidak direkam');
     } else {

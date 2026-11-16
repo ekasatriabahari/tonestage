@@ -35,6 +35,9 @@ export interface Spec extends TurboModule {
    * inside a run the file position at time t is startFileUs + (t - startNanoUs).
    */
   startEventLog(): Promise<void>;
+  /** Marks a pause caused by the video recording transport (manual backing pauses are not compressed). */
+  beginRecordingPause(): Promise<void>;
+  endRecordingPause(): Promise<void>;
   stopEventLog(): Promise<string>;
 
   /** Master volume for the backing-track output, 0.0 to 1.0 (linear), on top of setGain. */

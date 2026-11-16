@@ -231,6 +231,16 @@ class BackingTrackModule(reactContext: ReactApplicationContext) :
     promise.resolve(null)
   }
 
+  override fun beginRecordingPause(promise: Promise) {
+    engine.beginRecordingPause()
+    promise.resolve(null)
+  }
+
+  override fun endRecordingPause(promise: Promise) {
+    engine.endRecordingPause()
+    promise.resolve(null)
+  }
+
   override fun stopEventLog(promise: Promise) {
     promise.resolve(engine.stopEventLog().toString())
   }

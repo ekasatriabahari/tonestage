@@ -60,6 +60,12 @@ export interface Spec extends TurboModule {
     path: string,
   ): Promise<string>;
 
+  /** Pauses the active WAV capture while keeping its output file open. */
+  pauseAudioCapture(): Promise<boolean>;
+
+  /** Resumes a paused WAV capture and appends samples to the same file. */
+  resumeAudioCapture(): Promise<boolean>;
+
   /**
    * Stops the recording started by startAudioCapture. Resolves with JSON {ok, error, path,
    * sampleRate, channels, frames, peaks, rms, clippedTotal, timing, startUs, ...}. startUs is the

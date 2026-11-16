@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type MeterState, nextMeterState, resetClipping } from '../native/audioMeter';
 import {
+  beginBackingRecordingPause,
+  endBackingRecordingPause,
   lastBackingFile,
   listBackingOutputs,
   loadBackingTrack,
@@ -186,17 +188,21 @@ export function useBackingTrack(active: boolean) {
   }, [lastFile, loadFromUri]);
 
   const play = useCallback(async () => {
-    if (!(await playBacking())) {
-      setMessage(describeBackingError('PLAYBACK_FAILED'));
-    }
+    const ok = await playBacking();
+    if (!ok) setMessage(describeBackingError('PLAYBACK_FAILED'));
+    return ok;
   }, []);
 
-  const pause = useCallback(async () => {
-    await pauseBacking();
+  const pause = useCallback(async () => pauseBacking(), []);
+
+  const stop = useCallback(async () => stopBacking(), []);
+
+  const markRecordingPause = useCallback(async () => {
+    await beginBackingRecordingPause();
   }, []);
 
-  const stop = useCallback(async () => {
-    await stopBacking();
+  const markRecordingResume = useCallback(async () => {
+    await endBackingRecordingPause();
   }, []);
 
   const seekTo = useCallback(async (positionMs: number) => {
@@ -259,6 +265,8 @@ export function useBackingTrack(active: boolean) {
     play,
     pause,
     stop,
+    markRecordingPause,
+    markRecordingResume,
     seekTo,
     seekBy,
     setVolume,

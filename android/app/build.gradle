@@ -121,4 +121,12 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.10.1")
     implementation("androidx.media3:media3-exoplayer-rtsp:1.10.1")
     implementation("androidx.media3:media3-ui:1.10.1")
+
+    // CameraX: native front/rear camera preview and video-only recording.
+    def cameraxVersion = "1.4.2"
+    implementation("androidx.camera:camera-core:${cameraxVersion}")
+    implementation("androidx.camera:camera-camera2:${cameraxVersion}")
+    implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
+    implementation("androidx.camera:camera-video:${cameraxVersion}")
+    implementation("androidx.camera:camera-view:${cameraxVersion}")
 }

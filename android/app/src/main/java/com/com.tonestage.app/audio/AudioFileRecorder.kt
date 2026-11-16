@@ -15,6 +15,8 @@ import org.json.JSONObject
 internal class AudioFileRecorder {
   @Volatile private var running = false
   @Volatile private var finalResult: JSONObject? = null
+  @Volatile private var paused = false
+  @Volatile private var activeRecord: AudioRecord? = null
   private var thread: Thread? = null
 
   /** Returns {ok, error, source, sampleRate, channels}. */
@@ -57,6 +59,8 @@ internal class AudioFileRecorder {
     }
 
     finalResult = null
+    paused = false
+    activeRecord = rec
     running = true
     val worker =
         Thread {
@@ -73,6 +77,34 @@ internal class AudioFileRecorder {
     result.put("sampleRate", rec.sampleRate)
     result.put("channels", rec.channelCount)
     return result
+  }
+
+  /** Pause the input capture without closing the WAV writer. */
+  fun pause(): Boolean {
+    val rec = activeRecord ?: return false
+    if (!running || paused) return false
+    paused = true
+    return try {
+      rec.stop()
+      true
+    } catch (_: Exception) {
+      paused = false
+      false
+    }
+  }
+
+  /** Resume input capture; new samples append to the same WAV file. */
+  fun resume(): Boolean {
+    val rec = activeRecord ?: return false
+    if (!running || !paused) return false
+    return try {
+      rec.startRecording()
+      val ok = rec.recordingState == AudioRecord.RECORDSTATE_RECORDING
+      paused = !ok
+      ok
+    } catch (_: Exception) {
+      false
+    }
   }
 
   /** Stops recording and returns the measured result. */
@@ -115,6 +147,7 @@ internal class AudioFileRecorder {
     var toSkip = skipFrames * channels
     var error = ""
     var captureStartNs = 0L // System.nanoTime() of frame 0 of the capture
+    var captureStartSet = false
     var timing = "none"
     var routed = false
     val timestamp = AudioTimestamp()
@@ -129,8 +162,13 @@ internal class AudioFileRecorder {
     var lastDataAt = System.nanoTime()
     try {
       while (running) {
+        if (paused) {
+          Thread.sleep(5)
+          continue
+        }
         val n = rec.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
         if (n < 0) {
+          if (paused) continue
           error = "READ_ERROR_$n"
           break
         }
@@ -138,13 +176,13 @@ internal class AudioFileRecorder {
         if (usable > 0) {
           val nowNs = System.nanoTime()
           lastDataAt = nowNs
-          if (timing != "timestamp" || nowNs - lastPollNs > 500_000_000L) {
+          if (!captureStartSet || nowNs - lastPollNs > 500_000_000L) {
             lastPollNs = nowNs
             val status = rec.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC)
             if (status == AudioRecord.SUCCESS) {
-              if (timing != "timestamp") {
-                captureStartNs =
-                    timestamp.nanoTime - timestamp.framePosition * 1_000_000_000L / sampleRate
+              if (!captureStartSet) {
+                captureStartNs = timestamp.nanoTime - timestamp.framePosition * 1_000_000_000L / sampleRate
+                captureStartSet = true
                 timing = "timestamp"
               }
               if (!haveStamp) {
@@ -154,9 +192,10 @@ internal class AudioFileRecorder {
               }
               lastStampNs = timestamp.nanoTime
               lastStampFrames = timestamp.framePosition
-            } else if (timing == "none") {
+            } else if (!captureStartSet) {
               // Estimate: the first read returned right after capturing its frames.
               captureStartNs = nowNs - (usable / channels) * 1_000_000_000L / sampleRate
+              captureStartSet = true
               timing = "estimated"
             }
           }
@@ -189,6 +228,8 @@ internal class AudioFileRecorder {
         writer.close()
       } catch (ignored: Exception) {}
       running = false
+      paused = false
+      activeRecord = null
     }
 
     val ok = error.isEmpty() && stats.frames > 0 && timing != "none"

@@ -22,6 +22,7 @@ type Props = {
   source: string;
   /** Saves the incoming video to this MP4 (inside the sessions folder); empty stops. */
   recordingPath?: string;
+  recordingPaused?: boolean;
   /** Tells the parent whether real video frames are being shown. */
   onVideoReady?: (ready: boolean) => void;
   onRecordingEvent?: (event: RecordingEvent) => void;
@@ -31,6 +32,7 @@ type Props = {
 export function YiLivePreview({
   source,
   recordingPath = '',
+  recordingPaused = false,
   onVideoReady,
   onRecordingEvent,
 }: Props) {
@@ -90,6 +92,7 @@ export function YiLivePreview({
         key={attempt}
         source={source}
         recordingPath={recordingPath}
+        recordingPaused={recordingPaused}
         onPlayerState={onPlayerState}
         style={styles.fill}
       />

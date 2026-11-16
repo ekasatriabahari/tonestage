@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown, Check } from 'lucide-react-native';
 import {
+  PermissionsAndroid,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandHeader } from '../components/BrandHeader';
+import { PhoneCameraPreview } from '../components/PhoneCameraPreview';
 import { RecordingPanel } from '../components/RecordingPanel';
 import { MiniStudioPanel } from '../components/MiniStudioPanel';
 import { YiLivePreview } from '../components/YiLivePreview';
@@ -23,69 +26,89 @@ import {
   validateRtspUrl,
 } from '../utils/rstpUrl';
 
+type CameraSource = 'yi' | 'front' | 'back';
 type StatusView = { color: string; text: string; detail?: string };
 
-/** Status text must only claim what is actually known. "active" is NOT "video playing". */
 function describeState(state: YiState): StatusView {
   switch (state.kind) {
     case 'activating':
-      return { color: colors.accent, text: 'Kamera: mengaktifkan siaran langsung...' };
+      return { color: colors.accent, text: 'Yi: mengaktifkan siaran langsung...' };
     case 'active':
       return {
         color: colors.success,
-        text: 'Kamera: perintah aktivasi diterima',
-        detail:
-          'Koneksi kontrol tetap terbuka selama pratinjau berjalan. Status video ditampilkan pada kotak pratinjau.',
+        text: 'Yi: perintah aktivasi diterima',
+        detail: 'Status video aktual ditampilkan pada kotak pratinjau.',
       };
     case 'error':
-      return { color: colors.danger, text: 'Kamera: gagal diaktifkan', detail: state.message };
+      return { color: colors.danger, text: 'Yi: gagal diaktifkan', detail: state.message };
     case 'lost':
-      return {
-        color: colors.danger,
-        text: 'Kamera: koneksi kontrol terputus',
-        detail: 'Periksa Wi-Fi kamera, lalu tekan Hubungkan lagi.',
-      };
+      return { color: colors.danger, text: 'Yi: koneksi kontrol terputus', detail: 'Periksa Wi-Fi kamera, lalu hubungkan lagi.' };
     default:
-      return { color: colors.inkMuted, text: 'Kamera: tidak terhubung' };
+      return { color: colors.inkMuted, text: 'Yi: tidak terhubung' };
   }
 }
 
-/**
- * Camera screen, step 3: sends the activation command, then shows the live preview.
- * "perintah aktivasi diterima" does NOT mean video is playing; only the preview box reports that.
- */
 export function CameraScreen({ backing, screenActive }: { backing: BackingTrack; screenActive: boolean }) {
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(DEFAULT_YI_RTSP_URL);
+  const [source, setSource] = useState<CameraSource>('yi');
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
+  const [cameraPermission, setCameraPermission] = useState(false);
+  const [cameraPermissionMessage, setCameraPermissionMessage] = useState<string | null>(null);
   const { state, activate, deactivate } = useYiActivation();
   const rec = useCombinedRecording(backing);
-  const { abort } = rec;
-  const cameraActive = state.kind === 'active';
+  const recordingLocked = ['starting', 'recording', 'paused', 'stopping'].includes(rec.phase);
 
-  // If the camera connection drops during a recording, stop everything and say so.
   useEffect(() => {
-    if (!cameraActive) {
-      abort('Koneksi kamera terputus, rekaman dihentikan.');
+    if (recordingLocked && !rec.videoReady) {
+      rec.abort(source === 'yi'
+        ? 'Koneksi atau stream Yi terputus, rekaman dihentikan.'
+        : 'Kamera HP terputus, rekaman dihentikan.');
     }
-  }, [cameraActive, abort]);
+  }, [recordingLocked, rec.videoReady, source, rec.abort]);
 
   const urlError = validateRtspUrl(url);
   const host = extractRtspHost(url);
   const moduleAvailable = isYiControlAvailable();
   const status = describeState(state);
-
   const busy = state.kind === 'activating';
   const isActive = state.kind === 'active';
-  const canPress = !busy && moduleAvailable && (isActive || host !== null);
-  const buttonLabel = busy ? 'Memproses...' : isActive ? 'Putuskan' : 'Hubungkan';
+  const canConnect = !busy && moduleAvailable && (isActive || host !== null);
 
-  const onPressMain = () => {
-    if (isActive) {
-      deactivate();
-    } else if (host !== null) {
-      activate(host);
+  const chooseSource = async (next: CameraSource) => {
+    if (recordingLocked) return;
+    if (next === 'yi') {
+      rec.setVideoReady(false);
+      setSource('yi');
+      return;
+    }
+    rec.setVideoReady(false);
+    setSource(next);
+    if (isActive) deactivate();
+    try {
+      const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+      if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+        setCameraPermissionMessage('Izin kamera diperlukan untuk menggunakan kamera HP.');
+        return;
+      }
+      setCameraPermission(true);
+      setCameraPermissionMessage(null);
+      setSource(next);
+    } catch {
+      setCameraPermissionMessage('Izin kamera tidak dapat diminta. Periksa pengaturan aplikasi Android.');
     }
   };
+
+  const onYiPress = () => {
+    if (isActive) deactivate();
+    else if (host !== null) activate(host);
+  };
+
+  const sourceOptions: { id: CameraSource; label: string }[] = [
+    { id: 'yi', label: 'Yi Action Cam' },
+    { id: 'front', label: 'Front Camera' },
+    { id: 'back', label: 'Rear Camera' },
+  ];
 
   return (
     <ScrollView
@@ -94,147 +117,168 @@ export function CameraScreen({ backing, screenActive }: { backing: BackingTrack;
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
       <BrandHeader />
 
-      {state.kind === 'active' && host !== null ? (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Sumber Video</Text>
+        <View style={styles.sourceDropdownWrap}>
+          <Pressable
+            onPress={() => setSourceMenuOpen(open => !open)}
+            disabled={recordingLocked}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: sourceMenuOpen, disabled: recordingLocked }}
+            style={[styles.sourceDropdown, recordingLocked && styles.sourceOptionDisabled]}>
+            <Text style={styles.sourceDropdownText}>
+              {sourceOptions.find(option => option.id === source)?.label ?? 'Pilih sumber video'}
+            </Text>
+            <ChevronDown size={18} color={colors.inkMuted} />
+          </Pressable>
+          {sourceMenuOpen && !recordingLocked ? (
+            <View style={styles.sourceMenu}>
+              {sourceOptions.map(option => {
+                const selected = source === option.id;
+                return (
+                  <Pressable
+                    key={option.id}
+                    onPress={() => {
+                      setSourceMenuOpen(false);
+                      void chooseSource(option.id);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={styles.sourceMenuItem}>
+                    <Text style={[styles.sourceMenuText, selected && styles.sourceTextActive]}>{option.label}</Text>
+                    {selected ? <Check size={17} color={colors.accent} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+        {recordingLocked ? <Text style={styles.helpText}>Sumber kamera tidak dapat diganti saat sesi aktif.</Text> : null}
+      </View>
+
+      {source === 'yi' ? (
         <>
-          <YiLivePreview
-            source={url.trim()}
+          {isActive && host !== null ? (
+            <YiLivePreview
+              source={url.trim()}
+              recordingPath={rec.videoRecordingPath}
+              recordingPaused={rec.videoRecordingPaused}
+              onVideoReady={rec.setVideoReady}
+              onRecordingEvent={rec.onVideoEvent}
+            />
+          ) : (
+            <View style={styles.preview}>
+              <Text style={styles.previewTitle}>Pratinjau Yi belum aktif</Text>
+              <Text style={styles.previewHint}>Hubungkan ponsel ke Wi-Fi Yi Action Cam, lalu aktifkan kamera.</Text>
+            </View>
+          )}
+
+          <Pressable
+            onPress={onYiPress}
+            disabled={!canConnect || recordingLocked}
+            accessibilityRole="button"
+            style={[styles.primaryButton, (!canConnect || recordingLocked) && styles.primaryButtonDisabled]}>
+            <Text style={[styles.primaryButtonText, (!canConnect || recordingLocked) && styles.primaryButtonTextDisabled]}>
+              {busy ? 'Memproses...' : isActive ? 'Putuskan Yi' : 'Hubungkan Yi'}
+            </Text>
+          </Pressable>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+            <Text style={styles.statusText}>{status.text}</Text>
+          </View>
+          {status.detail ? <Text style={styles.helpText}>{status.detail}</Text> : null}
+          <Text style={styles.helpText}>
+            {moduleAvailable
+              ? 'Yi Action Cam menggunakan RTSP melalui Wi-Fi kamera. Pertahankan koneksi Wi-Fi selama preview dan recording.'
+              : 'Modul kontrol kamera Yi tidak tersedia di build ini.'}
+          </Text>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Alamat RTSP</Text>
+            <TextInput
+              value={url}
+              onChangeText={setUrl}
+              editable={!busy && !isActive && !recordingLocked}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              placeholder={DEFAULT_YI_RTSP_URL}
+              placeholderTextColor={colors.inkMuted}
+              selectionColor={colors.accent}
+              style={[styles.input, urlError !== null && styles.inputError]}
+            />
+            {urlError !== null ? <Text style={styles.errorText}>{urlError}</Text> : null}
+            <Pressable
+              onPress={() => setUrl(DEFAULT_YI_RTSP_URL)}
+              disabled={busy || isActive || recordingLocked}
+              accessibilityRole="button"
+              style={styles.linkButton}>
+              <Text style={styles.linkText}>Pakai alamat bawaan Yi</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : cameraPermission ? (
+        <>
+          <PhoneCameraPreview
+            lensFacing={source}
             recordingPath={rec.videoRecordingPath}
+            recordingPaused={rec.videoRecordingPaused}
             onVideoReady={rec.setVideoReady}
             onRecordingEvent={rec.onVideoEvent}
           />
+          <Text style={styles.helpText}>
+            {source === 'front' ? 'Menggunakan kamera depan ponsel.' : 'Menggunakan kamera belakang ponsel.'}
+            {' '}Rekaman video disimpan tanpa audio kamera; audio gitar dan backing tetap diproses oleh sistem Tone Stage.
+          </Text>
         </>
       ) : (
         <View style={styles.preview}>
-          <Text style={styles.previewTitle}>Pratinjau kamera belum aktif</Text>
-          <Text style={styles.previewHint}>
-            Tekan Hubungkan untuk mengaktifkan siaran langsung dan memulai
-            pratinjau.
-          </Text>
+          <Text style={styles.previewTitle}>Izin kamera diperlukan</Text>
+          <Text style={styles.previewHint}>{cameraPermissionMessage ?? 'Pilih kamera HP untuk meminta izin dan menampilkan preview.'}</Text>
+          <Pressable onPress={() => chooseSource(source)} style={styles.permissionButton}>
+            <Text style={styles.permissionButtonText}>Izinkan kamera</Text>
+          </Pressable>
         </View>
       )}
-      <Pressable
-        onPress={onPressMain}
-        disabled={!canPress}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !canPress }}
-        style={[styles.primaryButton, !canPress && styles.primaryButtonDisabled]}>
-        <Text style={[styles.primaryButtonText, !canPress && styles.primaryButtonTextDisabled]}>
-          {buttonLabel}
-        </Text>
-      </Pressable>
-      <Text style={styles.helpText}>
-        {moduleAvailable
-          ? 'Sambungkan ponsel ke Wi-Fi kamera Yi (namanya mirip YDXJ_...), lalu tekan Hubungkan. Koneksi kontrol harus tetap terbuka agar video terus tampil.'
-          : 'Modul kontrol kamera tidak tersedia di build ini.'}
-      </Text>
 
       <RecordingPanel rec={rec} />
       <MiniStudioPanel backing={backing} active={screenActive} />
-
-      <View style={styles.statusBlock}>
-        <View style={styles.statusRow}>
-          <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-          <Text style={styles.statusText}>{status.text}</Text>
-        </View>
-        {status.detail !== undefined ? (
-          <Text style={state.kind === 'active' ? styles.helpText : styles.errorText}>
-            {status.detail}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>Alamat RTSP</Text>
-        <TextInput
-          value={url}
-          onChangeText={setUrl}
-          editable={!busy && !isActive}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          placeholder={DEFAULT_YI_RTSP_URL}
-          placeholderTextColor={colors.inkMuted}
-          selectionColor={colors.accent}
-          style={[styles.input, urlError !== null && styles.inputError]}
-        />
-        {urlError !== null ? (
-          <Text style={styles.errorText}>{urlError}</Text>
-        ) : (
-          <Text style={styles.helpText}>
-            Format alamat valid. Alamat kamera diambil dari sini untuk mengirim
-            perintah aktivasi.
-          </Text>
-        )}
-
-        <Pressable
-          onPress={() => setUrl(DEFAULT_YI_RTSP_URL)}
-          disabled={busy || isActive}
-          accessibilityRole="button"
-          style={styles.linkButton}>
-          <Text style={styles.linkText}>Pakai alamat bawaan Yi</Text>
-        </Pressable>
-      </View>
-
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { paddingHorizontal: 16, paddingBottom: 24, gap: 16 },
-  preview: {
-    aspectRatio: 16 / 9,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    gap: 6,
-  },
+  content: { paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
+  section: { gap: 8 },
+  sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  sourceDropdownWrap: { position: 'relative', zIndex: 20 },
+  sourceDropdown: { minHeight: 46, borderColor: colors.border, borderWidth: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'space-between', flexDirection: 'row', paddingHorizontal: 14, backgroundColor: colors.surface },
+  sourceDropdownText: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  sourceMenu: { marginTop: 6, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  sourceMenuItem: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  sourceMenuText: { color: colors.inkMuted, fontSize: 14, fontWeight: '500' },
+  sourceOptionDisabled: { opacity: 0.55 },
+  sourceText: { color: colors.inkMuted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  sourceTextActive: { color: colors.accent },
+  preview: { aspectRatio: 16 / 9, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', padding: 20, gap: 8 },
   previewTitle: { color: colors.ink, fontSize: 16, fontWeight: '600' },
-  previewHint: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  statusBlock: { gap: 6 },
+  previewHint: { color: colors.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  statusText: { color: colors.ink, fontSize: 14, flexShrink: 1 },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
-  },
+  statusDot: { width: 9, height: 9, borderRadius: 5 },
+  statusText: { color: colors.ink, fontSize: 13, flexShrink: 1 },
+  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 16, gap: 8 },
   label: { color: colors.ink, fontSize: 14, fontWeight: '600' },
-  input: {
-    backgroundColor: colors.surfaceRaised,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    color: colors.ink,
-    fontSize: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
+  input: { backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderWidth: 1, borderRadius: 10, color: colors.ink, fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
   inputError: { borderColor: colors.danger },
   errorText: { color: colors.danger, fontSize: 13, lineHeight: 18 },
-  helpText: { color: colors.inkMuted, fontSize: 13, lineHeight: 18 },
+  helpText: { color: colors.inkMuted, fontSize: 12, lineHeight: 17 },
   linkButton: { alignSelf: 'flex-start', paddingVertical: 6 },
-  linkText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
-  primaryButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
+  linkText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  primaryButton: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   primaryButtonDisabled: { backgroundColor: colors.surfaceRaised },
-  primaryButtonText: { color: colors.background, fontSize: 16, fontWeight: '700' },
+  primaryButtonText: { color: colors.background, fontSize: 15, fontWeight: '700' },
   primaryButtonTextDisabled: { color: colors.inkMuted },
+  permissionButton: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10, marginTop: 4 },
+  permissionButtonText: { color: colors.background, fontSize: 13, fontWeight: '700' },
 });

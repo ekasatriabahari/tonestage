@@ -28,20 +28,21 @@ export function RecordingPanel({ rec }: Props) {
 
   const idleLike = rec.phase === 'idle' || rec.phase === 'finished' || rec.phase === 'error';
   const canPress = idleLike ? rec.videoReady : rec.phase !== 'stopping';
-  const active = rec.phase === 'starting' || rec.phase === 'recording';
   const label =
     rec.phase === 'recording'
       ? `Berhenti rekam (${clock(now - rec.since)})`
       : rec.phase === 'starting'
         ? 'Menunggu keyframe... (ketuk untuk batal)'
+        : rec.phase === 'paused'
+        ? 'Rekaman dijeda'
         : rec.phase === 'stopping'
           ? 'Menyimpan sesi...'
-          : 'Rekam sesi (video + gitar)';
+          : 'Rekam sesi (video + gitar + backing)';
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.help}>
-        Sumber gitar: perangkat USB bila ada; jika tidak, mikrofon ponsel (hanya untuk uji).
+        Sumber gitar: perangkat USB bila ada; jika tidak, mikrofon ponsel (hanya untuk uji). Backing track yang sudah dimuat akan mulai otomatis dan mengikuti pause/resume rekaman.
         {rec.audioChoice !== null ? ` Dipakai: ${rec.audioChoice.name}${rec.audioChoice.isUsb ? ' (USB)' : ' (mikrofon ponsel)'}.` : ''}
       </Text>
       {rec.storage !== null ? (
@@ -50,13 +51,34 @@ export function RecordingPanel({ rec }: Props) {
         </Text>
       ) : null}
 
-      <Pressable
-        onPress={active ? rec.stop : rec.start}
-        disabled={!canPress}
-        accessibilityRole="button"
-        style={[styles.recordButton, active && styles.recordButtonActive, !canPress && styles.disabled]}>
-        <Text style={[styles.recordText, active && styles.recordTextActive]}>{label}</Text>
-      </Pressable>
+      {idleLike ? (
+        <Pressable
+          onPress={rec.start}
+          disabled={!canPress}
+          accessibilityRole="button"
+          style={[styles.recordButton, !canPress && styles.disabled]}>
+          <Text style={styles.recordText}>{label}</Text>
+        </Pressable>
+      ) : rec.phase === 'stopping' ? (
+        <View style={[styles.recordButton, styles.disabled]}>
+          <Text style={styles.recordText}>Menyimpan sesi...</Text>
+        </View>
+      ) : (
+        <View style={styles.controls}>
+          <Pressable
+            onPress={rec.phase === 'paused' ? rec.resume : rec.pause}
+            disabled={rec.phase === 'starting' || rec.transportPending}
+            accessibilityRole="button"
+            style={[styles.pauseButton, rec.phase === 'paused' && styles.resumeButton]}>
+            <Text style={styles.controlText}>
+              {rec.transportPending ? 'Memproses...' : rec.phase === 'paused' ? 'Lanjutkan' : rec.phase === 'starting' ? 'Memulai...' : 'Pause'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={rec.stop} disabled={rec.transportPending || (rec.phase === 'starting' && !rec.canStopStarting)} accessibilityRole="button" style={[styles.stopButton, (rec.transportPending || (rec.phase === 'starting' && !rec.canStopStarting)) && styles.disabled]}>
+            <Text style={styles.controlText}>Stop</Text>
+          </Pressable>
+        </View>
+      )}
 
       {rec.message !== null ? <Text style={styles.error}>{rec.message}</Text> : null}
       {rec.audioError !== null ? <Text style={styles.error}>Audio: {rec.audioError}</Text> : null}
@@ -91,6 +113,11 @@ const styles = StyleSheet.create({
   recordButtonActive: { backgroundColor: colors.record },
   recordText: { color: colors.record, fontSize: 14, fontWeight: '700' },
   recordTextActive: { color: colors.ink },
+  controls: { flexDirection: 'row', gap: 10 },
+  pauseButton: { flex: 1, borderColor: colors.accent, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  resumeButton: { backgroundColor: colors.accent },
+  stopButton: { flex: 1, backgroundColor: colors.record, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  controlText: { color: colors.ink, fontSize: 14, fontWeight: '700' },
   error: { color: colors.danger, fontSize: 13, lineHeight: 18 },
   result: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14, gap: 4 },
   resultTitle: { color: colors.ink, fontSize: 15, fontWeight: '700' },

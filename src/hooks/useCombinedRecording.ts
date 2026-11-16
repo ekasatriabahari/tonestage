@@ -5,7 +5,7 @@ import {
   type AudioChoice,
   pickAudioInput,
 } from '../native/avRecording';
-import { beginAudioCapture, endAudioCapture } from '../native/avTest';
+import { beginAudioCapture, endAudioCapture, pauseAudioCapture, resumeAudioCapture } from '../native/avTest';
 import { type BackingLog } from '../native/backingTrackLogic';
 import { startBackingLog, stopBackingLog } from '../native/backingTrack';
 import {
@@ -29,6 +29,7 @@ export type RecPhase =
   | 'idle'
   | 'starting'
   | 'recording'
+  | 'paused'
   | 'stopping'
   | 'finished'
   | 'error';
@@ -51,6 +52,9 @@ export function useCombinedRecording(backing: BackingTrack) {
   const [videoReady, setVideoReady] = useState(false);
   const [phase, setPhase] = useState<RecPhase>('idle');
   const [videoRecordingPath, setVideoRecordingPath] = useState('');
+  const [videoRecordingPaused, setVideoRecordingPaused] = useState(false);
+  const [transportPending, setTransportPending] = useState(false);
+  const transportBusy = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const [audioChoice, setAudioChoice] = useState<AudioChoice | null>(null);
   const [since, setSince] = useState(0);
@@ -81,6 +85,7 @@ export function useCombinedRecording(backing: BackingTrack) {
 
   const reset = useCallback(() => {
     setMessage(null);
+    setVideoRecordingPaused(false);
     setVideoStats(null);
     setVideoFailed(false);
     setAudioResult(null);
@@ -116,6 +121,7 @@ export function useCombinedRecording(backing: BackingTrack) {
     reset();
     setPhase('starting');
     const fail = async (text: string) => {
+      await latest.current.stop();
       await finishAudio();
       await finishLog();
       const current = session.current;
@@ -179,6 +185,13 @@ export function useCombinedRecording(backing: BackingTrack) {
     };
     await startBackingLog();
     logActive.current = true;
+    if (b.loadedUri !== null && b.loaded !== null) {
+      await b.seekTo(0);
+      if (!(await b.play())) {
+        await fail('Backing track gagal dimulai. Periksa file dan output audio, lalu coba lagi.');
+        return;
+      }
+    }
     const began = await beginAudioCapture(choice.id, created.audioPath);
     if (!began.ok) {
       await fail(began.message);
@@ -186,15 +199,65 @@ export function useCombinedRecording(backing: BackingTrack) {
     }
     audioActive.current = true;
     setAudioChoice(choice);
+    setVideoRecordingPaused(false);
     setVideoRecordingPath(created.videoPath);
   }, [reset, finishAudio, finishLog]);
 
+  const pause = useCallback(async () => {
+    if (phase !== 'recording' || transportBusy.current) return;
+    transportBusy.current = true;
+    setTransportPending(true);
+    try {
+      if (audioActive.current && !(await pauseAudioCapture())) {
+        setMessage('Input gitar gagal dijeda. Rekaman tetap berjalan.');
+        return;
+      }
+      const hasBacking = latest.current.loadedUri !== null && latest.current.loaded !== null;
+      if (hasBacking && !(await latest.current.pause())) {
+        if (audioActive.current) await resumeAudioCapture();
+        setMessage('Backing track gagal dijeda. Rekaman tetap berjalan.');
+        return;
+      }
+      await latest.current.markRecordingPause();
+      setVideoRecordingPaused(true);
+      setPhase('paused');
+    } finally {
+      transportBusy.current = false;
+      setTransportPending(false);
+    }
+  }, [phase]);
+
+  const resume = useCallback(async () => {
+    if (phase !== 'paused' || transportBusy.current) return;
+    transportBusy.current = true;
+    setTransportPending(true);
+    try {
+      const hasBacking = latest.current.loadedUri !== null && latest.current.loaded !== null;
+      if (hasBacking && !(await latest.current.play())) {
+        setMessage('Backing track gagal dilanjutkan. Rekaman masih dijeda.');
+        return;
+      }
+      if (audioActive.current && !(await resumeAudioCapture())) {
+        if (hasBacking) await latest.current.pause();
+        setMessage('Input gitar gagal dilanjutkan. Rekaman masih dijeda.');
+        return;
+      }
+      await latest.current.markRecordingResume();
+      setVideoRecordingPaused(false);
+      setPhase('recording');
+    } finally {
+      transportBusy.current = false;
+      setTransportPending(false);
+    }
+  }, [phase]);
+
   const stop = useCallback(async () => {
-    if (phase !== 'starting' && phase !== 'recording') {
+    if (phase !== 'starting' && phase !== 'recording' && phase !== 'paused') {
       return;
     }
     setPhase('stopping');
     setVideoRecordingPath(''); // the preview then reports the video result
+    await latest.current.stop();
     await finishAudio();
     await finishLog();
   }, [phase, finishAudio, finishLog]);
@@ -286,11 +349,13 @@ export function useCombinedRecording(backing: BackingTrack) {
       if (
         phase !== 'starting' &&
         phase !== 'recording' &&
+        phase !== 'paused' &&
         phase !== 'stopping'
       ) {
         return;
       }
       setVideoRecordingPath('');
+      await latest.current.stop();
       await finishAudio();
       await finishLog();
       setMessage(reason);
@@ -318,6 +383,9 @@ export function useCombinedRecording(backing: BackingTrack) {
     setVideoReady,
     phase,
     videoRecordingPath,
+    canStopStarting: videoRecordingPath !== '',
+    videoRecordingPaused,
+    transportPending,
     message,
     audioChoice,
     since,
@@ -327,6 +395,8 @@ export function useCombinedRecording(backing: BackingTrack) {
     savedId,
     storage,
     start,
+    pause,
+    resume,
     stop,
     onVideoEvent,
     abort,

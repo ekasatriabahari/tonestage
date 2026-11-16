@@ -66,6 +66,7 @@ export type RecordingStats = {
   csdFromFormat: boolean;
   /** Time of the first video sample on the System.nanoTime() clock (microseconds). */
   firstSampleUs: number;
+  source?: string;
 };
 
 /** What the preview reports about a video recording. */
@@ -96,6 +97,7 @@ export function parseRecordingStats(json: string): RecordingStats {
     nonMonotonic: num(e.nonMonotonic),
     csdFromFormat: e.csdFromFormat === true,
     firstSampleUs: num(e.firstSampleUs),
+    ...(typeof e.source === 'string' ? { source: e.source } : {}),
   };
 }
 
@@ -122,14 +124,19 @@ export function describeRecordingError(code: string): string {
 export function summarizeRecording(s: RecordingStats): string[] {
   const lines: string[] = [];
   lines.push(`Resolusi: ${s.width}x${s.height}`);
+  if (s.source === 'yi-rtsp') lines.push('Sumber: Yi Action Cam (RTSP)');
+  else if (s.source === 'phone-front') lines.push('Sumber: kamera depan HP');
+  else if (s.source === 'phone-rear') lines.push('Sumber: kamera belakang HP');
   const mediaSec = s.mediaDurationMs / 1000;
   const wallSec = s.wallMs / 1000;
-  if (mediaSec > 0) {
+  if (s.frames > 0 && mediaSec > 0) {
     lines.push(
       `Frame: ${s.frames} (${s.keyFrames} keyframe), rata-rata ${(s.frames / mediaSec).toFixed(1)} fps`,
     );
-  } else {
+  } else if (s.frames > 0) {
     lines.push(`Frame: ${s.frames} (${s.keyFrames} keyframe)`);
+  } else {
+    lines.push('Jumlah frame: tidak dilaporkan oleh perekam kamera HP');
   }
   lines.push(
     `Durasi isi file: ${mediaSec.toFixed(2)} dtk | waktu nyata: ${wallSec.toFixed(2)} dtk | selisih: ${(mediaSec - wallSec).toFixed(2)} dtk`,
@@ -140,17 +147,21 @@ export function summarizeRecording(s: RecordingStats): string[] {
       ? `Ukuran video: ${kb} KB (rata-rata ${Math.round((s.bytes * 8) / mediaSec / 1000)} kbps)`
       : `Ukuran video: ${kb} KB`,
   );
-  lines.push(`Menunggu keyframe pertama: ${s.waitedForKeyframeMs} ms`);
-  if (s.skippedBeforeStart > 0) {
-    lines.push(`Frame dilewati sebelum keyframe pertama: ${s.skippedBeforeStart}`);
+  if (s.source === 'phone-front' || s.source === 'phone-rear') {
+    lines.push('Encoder: CameraX / Android');
+  } else {
+    lines.push(`Menunggu keyframe pertama: ${s.waitedForKeyframeMs} ms`);
+    if (s.skippedBeforeStart > 0) {
+      lines.push(`Frame dilewati sebelum keyframe pertama: ${s.skippedBeforeStart}`);
+    }
+    if (s.nonMonotonic > 0) {
+      lines.push(`Timestamp mundur yang dikoreksi: ${s.nonMonotonic} kali`);
+    }
+    lines.push(
+      s.csdFromFormat
+        ? 'Parameter video (SPS/PPS) dilengkapi dari data SDP kamera.'
+        : 'Parameter video (SPS/PPS) ditemukan di dalam aliran video.',
+    );
   }
-  if (s.nonMonotonic > 0) {
-    lines.push(`Timestamp mundur yang dikoreksi: ${s.nonMonotonic} kali`);
-  }
-  lines.push(
-    s.csdFromFormat
-      ? 'Parameter video (SPS/PPS) dilengkapi dari data SDP kamera.'
-      : 'Parameter video (SPS/PPS) ditemukan di dalam aliran video.',
-  );
   return lines;
 }
