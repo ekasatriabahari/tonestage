@@ -42,6 +42,8 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private var previewRotationDegrees = 0
   private var previewMirroring = false
   private var previewCropRect: RectF? = null
+  private var previewResolution: android.util.Size? = null
+  private var previewTargetRotation = Surface.ROTATION_0
   private var provider: ProcessCameraProvider? = null
   private var preview: Preview? = null
   private var videoCapture: VideoCapture<Recorder>? = null
@@ -149,11 +151,13 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       val nextPreview = Preview.Builder().setTargetRotation(rotation).build().also { useCase ->
         useCase.setSurfaceProvider(mainExecutor) { request ->
           Log.d(TAG, "SurfaceProvider request resolution=${request.resolution} texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable}")
+          previewResolution = request.resolution
           request.setTransformationInfoListener(mainExecutor) { info ->
             // CameraX reports the clockwise correction needed for the target
             // display. TextureView's transform uses the opposite sign to
             // orient the raw SurfaceTexture buffer in view coordinates.
             previewRotationDegrees = info.rotationDegrees
+            previewTargetRotation = info.targetRotation
             previewMirroring = info.isMirroring
             previewCropRect = RectF(info.cropRect)
             applyPreviewTransform()
@@ -188,53 +192,103 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   }
 
   /**
-   * Apply CameraX's explicit clockwise rotation correction to the raw
-   * SurfaceTexture buffer, then apply front-camera mirroring independently.
-   * Finally center-crop the transformed buffer to the TextureView bounds.
+   * Port of CameraX PreviewTransformation for a custom TextureView surface.
+   *
+   * TextureView.setTransform only corrects display rotation. CameraX's
+   * rotationDegrees/cropRect are applied to the TextureView's view geometry,
+   * not directly as a buffer-pixel matrix. Front-camera mirroring also changes
+   * axis when the upright output is rotated by 90/270 degrees.
    */
   private fun applyPreviewTransform() {
     val viewWidth = previewTexture.width.toFloat()
     val viewHeight = previewTexture.height.toFloat()
-    if (viewWidth <= 0f || viewHeight <= 0f || !previewTexture.isAvailable) return
-
+    val resolution = previewResolution ?: return
     val crop = previewCropRect ?: return
-    if (crop.width() <= 0f || crop.height() <= 0f) return
+    if (!previewTexture.isAvailable || viewWidth <= 0f || viewHeight <= 0f) return
+    if (resolution.width <= 0 || resolution.height <= 0 || crop.width() <= 0f || crop.height() <= 0f) return
 
-    // SurfaceRequest reports the clockwise correction for CameraX's
-    // output coordinate space. TextureView.setTransform operates on the
-    // SurfaceTexture view space, whose required correction is the inverse.
-    // Keep this metadata-driven per-lens (never infer it from aspect ratio).
-    val transformRotation = -previewRotationDegrees.toFloat()
-    val rotate = Matrix().apply {
-      setRotate(transformRotation, crop.centerX(), crop.centerY())
+    val targetRotationDegrees = when (previewTargetRotation) {
+      Surface.ROTATION_90 -> 90f
+      Surface.ROTATION_180 -> 180f
+      Surface.ROTATION_270 -> 270f
+      else -> 0f
     }
-    val rotatedBounds = RectF(crop)
-    rotate.mapRect(rotatedBounds)
-    if (rotatedBounds.width() <= 0f || rotatedBounds.height() <= 0f) return
 
-    val scale = maxOf(viewWidth / rotatedBounds.width(), viewHeight / rotatedBounds.height())
-    val translateX = viewWidth / 2f - rotatedBounds.centerX() * scale
-    val translateY = viewHeight / 2f - rotatedBounds.centerY() * scale
-    val orientation = if (previewMirroring) {
-      val mirror = Matrix().apply {
-        setScale(-1f, 1f, crop.centerX(), crop.centerY())
+    // TextureView does not account for display rotation itself. Apply only
+    // the inverse target-display rotation here (not sensor rotationDegrees).
+    val surfaceRect = RectF(0f, 0f, resolution.width.toFloat(), resolution.height.toFloat())
+    val textureCorrection = Matrix()
+    if (targetRotationDegrees != 0f) {
+      val correctionRotation = Matrix().apply {
+        setRotate(-targetRotationDegrees, surfaceRect.centerX(), surfaceRect.centerY())
       }
-      Matrix().apply { setConcat(mirror, rotate) }
-    } else {
-      rotate
+      val correctedBounds = RectF(surfaceRect)
+      correctionRotation.mapRect(correctedBounds)
+      val correctionScaleX = surfaceRect.width() / correctedBounds.width()
+      val correctionScaleY = surfaceRect.height() / correctedBounds.height()
+      val correctionFit = Matrix().apply {
+        setValues(floatArrayOf(
+          correctionScaleX, 0f, surfaceRect.centerX() - correctedBounds.centerX() * correctionScaleX,
+          0f, correctionScaleY, surfaceRect.centerY() - correctedBounds.centerY() * correctionScaleY,
+          0f, 0f, 1f
+        ))
+      }
+      textureCorrection.setConcat(correctionFit, correctionRotation)
     }
+    previewTexture.setTransform(textureCorrection)
+
+    // Map CameraX's cropped surface into the view using FILL_CENTER.
+    val rotation = previewRotationDegrees.toFloat()
+    val rotate = Matrix().apply {
+      setRotate(rotation, crop.centerX(), crop.centerY())
+    }
+    val rotatedCrop = RectF(crop)
+    rotate.mapRect(rotatedCrop)
+    if (rotatedCrop.width() <= 0f || rotatedCrop.height() <= 0f) return
+
+    val scale = maxOf(viewWidth / rotatedCrop.width(), viewHeight / rotatedCrop.height())
+    val destination = RectF(
+      viewWidth / 2f - rotatedCrop.width() * scale / 2f,
+      viewHeight / 2f - rotatedCrop.height() * scale / 2f,
+      viewWidth / 2f + rotatedCrop.width() * scale / 2f,
+      viewHeight / 2f + rotatedCrop.height() * scale / 2f
+    )
     val fit = Matrix().apply {
       setValues(floatArrayOf(
-        scale, 0f, translateX,
-        0f, scale, translateY,
+        scale, 0f, destination.left - rotatedCrop.left * scale,
+        0f, scale, destination.top - rotatedCrop.top * scale,
         0f, 0f, 1f
       ))
     }
-    val transform = Matrix()
-    transform.setConcat(fit, orientation)
-    previewTexture.setTransform(transform)
+    val surfaceToView = Matrix().apply { setConcat(fit, rotate) }
 
-    Log.d(TAG, "applied preview matrix lens=$currentLensFacing metadataRotation=$previewRotationDegrees transformRotation=$transformRotation mirrored=$previewMirroring buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
+    // CameraX mirrors front-camera output in the Surface. Compensate in the
+    // source coordinate system: vertical flip for 90/270, horizontal for 0/180.
+    if (previewMirroring) {
+      val mirror = Matrix().apply {
+        if (rotation.toInt() % 180 != 0) {
+          setScale(1f, -1f, crop.centerX(), crop.centerY())
+        } else {
+          setScale(-1f, 1f, crop.centerX(), crop.centerY())
+        }
+      }
+      val mirroredSurfaceToView = Matrix()
+      mirroredSurfaceToView.setConcat(surfaceToView, mirror)
+      surfaceToView.set(mirroredSurfaceToView)
+    }
+
+    // Apply the crop/rotation as View geometry, separate from TextureView's
+    // display correction, matching CameraX PreviewTransformation.
+    val transformedSurface = RectF(surfaceRect)
+    surfaceToView.mapRect(transformedSurface)
+    previewTexture.pivotX = 0f
+    previewTexture.pivotY = 0f
+    previewTexture.scaleX = transformedSurface.width() / resolution.width.toFloat()
+    previewTexture.scaleY = transformedSurface.height() / resolution.height.toFloat()
+    previewTexture.translationX = transformedSurface.left - previewTexture.left
+    previewTexture.translationY = transformedSurface.top - previewTexture.top
+
+    Log.d(TAG, "applied preview matrix lens=$currentLensFacing rotationDegrees=$previewRotationDegrees targetRotation=$previewTargetRotation mirrored=$previewMirroring surface=\${resolution.width}x\${resolution.height} crop=\${crop.width()}x\${crop.height()} view=\${viewWidth}x\${viewHeight} mapped=\${transformedSurface.width()}x\${transformedSurface.height()} offset=\${transformedSurface.left},\${transformedSurface.top}")
   }
 
   /** Fulfil CameraX's SurfaceRequest using the TextureView SurfaceTexture. */
@@ -251,6 +305,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val resolution = request.resolution
     try {
       texture.setDefaultBufferSize(resolution.width, resolution.height)
+      previewResolution = resolution
       previewFrameReceived = false
       if (previewCropRect == null) {
         previewCropRect = RectF(0f, 0f, resolution.width.toFloat(), resolution.height.toFloat())
