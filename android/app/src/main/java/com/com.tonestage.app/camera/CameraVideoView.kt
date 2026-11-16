@@ -200,16 +200,16 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val crop = previewCropRect ?: return
     if (crop.width() <= 0f || crop.height() <= 0f) return
 
-    // Use the actual buffer and view aspect, not CameraX's per-lens
-    // rotationDegrees. On this device both sensors deliver landscape buffers
-    // while the preview surface is portrait; the required correction is
-    // therefore the same clockwise quarter-turn for front and rear cameras.
-    // This also adapts automatically when the app is displayed in landscape.
-    val transformRotation = when {
+    // Rotate each lens into the upright view orientation. The front camera
+    // is mirrored below; that reflection reverses the apparent direction of
+    // rotation, so its rotation sign must be opposite to the rear camera.
+    // Use the actual buffer/view aspect so the preview also adapts to landscape.
+    val quarterTurn = when {
       viewHeight > viewWidth && crop.width() > crop.height() -> 90f
       viewWidth > viewHeight && crop.height() > crop.width() -> -90f
       else -> 0f
     }
+    val transformRotation = if (previewMirroring) -quarterTurn else quarterTurn
     val rotate = Matrix().apply {
       setRotate(transformRotation, crop.centerX(), crop.centerY())
     }
