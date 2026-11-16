@@ -12,7 +12,6 @@ import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
-import androidx.camera.view.PreviewView
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
@@ -24,7 +23,6 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.Observer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
@@ -42,6 +40,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
   private var activePreviewSurface: Surface? = null
   private var previewFrameReceived = false
   private var previewRotationDegrees = 0
+  private var previewMirroring = false
   private var previewCropRect: RectF? = null
   private var provider: ProcessCameraProvider? = null
   private var preview: Preview? = null
@@ -151,6 +150,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
             // display. TextureView's transform uses the opposite sign to
             // orient the raw SurfaceTexture buffer in view coordinates.
             previewRotationDegrees = info.rotationDegrees
+            previewMirroring = info.isMirroring
             previewCropRect = RectF(info.cropRect)
             applyPreviewTransform()
             Log.d(TAG, "preview transform rotation=${info.rotationDegrees} crop=${info.cropRect}")
@@ -206,6 +206,14 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val scale = maxOf(viewWidth / rotatedBounds.width(), viewHeight / rotatedBounds.height())
     val translateX = viewWidth / 2f - rotatedBounds.centerX() * scale
     val translateY = viewHeight / 2f - rotatedBounds.centerY() * scale
+    val orientation = if (previewMirroring) {
+      val mirror = Matrix().apply {
+        setScale(-1f, 1f, crop.centerX(), crop.centerY())
+      }
+      Matrix().apply { setConcat(mirror, rotate) }
+    } else {
+      rotate
+    }
     val fit = Matrix().apply {
       setValues(floatArrayOf(
         scale, 0f, translateX,
@@ -214,10 +222,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       ))
     }
     val transform = Matrix()
-    transform.setConcat(fit, rotate)
+    transform.setConcat(fit, orientation)
     previewTexture.setTransform(transform)
 
-    Log.d(TAG, "applied preview matrix rotation=${-previewRotationDegrees} buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
+    Log.d(TAG, "applied preview matrix rotation=${-previewRotationDegrees} mirrored=$previewMirroring buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
   }
 
   /** Fulfil CameraX's SurfaceRequest using the TextureView SurfaceTexture. */
