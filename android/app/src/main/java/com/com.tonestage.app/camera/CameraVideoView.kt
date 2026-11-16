@@ -200,8 +200,18 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     val crop = previewCropRect ?: return
     if (crop.width() <= 0f || crop.height() <= 0f) return
 
+    // Use the actual buffer and view aspect, not CameraX's per-lens
+    // rotationDegrees. On this device both sensors deliver landscape buffers
+    // while the preview surface is portrait; the required correction is
+    // therefore the same clockwise quarter-turn for front and rear cameras.
+    // This also adapts automatically when the app is displayed in landscape.
+    val transformRotation = when {
+      viewHeight > viewWidth && crop.width() > crop.height() -> 90f
+      viewWidth > viewHeight && crop.height() > crop.width() -> -90f
+      else -> 0f
+    }
     val rotate = Matrix().apply {
-      setRotate(-previewRotationDegrees.toFloat(), crop.centerX(), crop.centerY())
+      setRotate(transformRotation, crop.centerX(), crop.centerY())
     }
     val rotatedBounds = RectF(crop)
     rotate.mapRect(rotatedBounds)
@@ -229,7 +239,7 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
     transform.setConcat(fit, orientation)
     previewTexture.setTransform(transform)
 
-    Log.d(TAG, "applied preview matrix rotation=${-previewRotationDegrees} mirrored=$previewMirroring buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
+    Log.d(TAG, "applied preview matrix metadataRotation=$previewRotationDegrees transformRotation=$transformRotation mirrored=$previewMirroring buffer=${crop.width()}x${crop.height()} rotated=${rotatedBounds.width()}x${rotatedBounds.height()} view=${viewWidth}x${viewHeight} scale=$scale")
   }
 
   /** Fulfil CameraX's SurfaceRequest using the TextureView SurfaceTexture. */
