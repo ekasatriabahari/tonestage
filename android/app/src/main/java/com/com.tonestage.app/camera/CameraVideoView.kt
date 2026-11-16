@@ -139,6 +139,10 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
       Log.d(TAG, "bindCamera start lens=$currentLensFacing includeVideoCapture=$includeVideoCapture texture=${previewTexture.width}x${previewTexture.height} available=${previewTexture.isAvailable}")
       pendingSurfaceRequest?.willNotProvideSurface()
       pendingSurfaceRequest = null
+      previewCropRect = null
+      previewRotationDegrees = 0
+      previewMirroring = false
+      previewFrameReceived = false
       cameraProvider.unbindAll()
       cameraBound = false
       val rotation = previewTexture.display?.rotation ?: Surface.ROTATION_0
