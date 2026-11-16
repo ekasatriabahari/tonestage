@@ -3,7 +3,6 @@ package com.tonestage.app.camera
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.util.Log
-import android.view.OrientationEventListener
 import android.view.Surface
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
@@ -250,7 +249,6 @@ class CameraVideoView(context: Context) : FrameLayout(context) {
 
   fun release() {
     released = true
-    orientationListener.disable()
     stopRecording()
     streamStateObserver?.let { previewView.previewStreamState.removeObserver(it) }
     streamStateObserver = null
